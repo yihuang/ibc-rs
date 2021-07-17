@@ -7,9 +7,7 @@ use anomaly::BoxError;
 use crossbeam_channel::Sender;
 use tracing::trace;
 
-use ibc::{
-    ics02_client::events::NewBlock, ics24_host::identifier::ChainId, Height,
-};
+use ibc::{ics02_client::events::NewBlock, ics24_host::identifier::ChainId, Height};
 
 use crate::{event::monitor::EventBatch, object::Object};
 

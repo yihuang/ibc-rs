@@ -209,7 +209,8 @@ impl Supervisor {
                         continue;
                     }
 
-                    let object = ewh.event
+                    let object = ewh
+                        .event
                         .connection_attributes()
                         .map(|attr| Object::connection_from_conn_open_events(attr, src_chain));
 
@@ -222,7 +223,8 @@ impl Supervisor {
                         continue;
                     }
 
-                    let object = ewh.event
+                    let object = ewh
+                        .event
                         .channel_attributes()
                         .map(|attr| Object::channel_from_chan_open_events(attr, src_chain));
 
@@ -559,7 +561,11 @@ impl Supervisor {
         let mut collected = self.collect_events(src_chain.clone().as_ref(), batch);
 
         if chain_id.as_str() == "ibc-1" {
-            info!("\t [2--supervisor@{}] collected events are: {:?}", src_chain.id(), collected);
+            info!(
+                "\t [2--supervisor@{}] collected events are: {:?}",
+                src_chain.id(),
+                collected
+            );
         }
 
         for (object, events) in collected.per_object.drain() {

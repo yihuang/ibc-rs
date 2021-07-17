@@ -1,9 +1,9 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use anomaly::BoxError;
+use itertools::Itertools;
 use tendermint_rpc::event::{Event as RpcEvent, EventData as RpcEventData};
 use tracing::info;
-use itertools::Itertools;
 
 use ibc::ics02_client::events::NewBlock;
 use ibc::ics02_client::height::Height;
@@ -18,14 +18,14 @@ use ibc::{
 #[derive(Debug, Clone)]
 pub struct IbcEventWithHash {
     pub event: IbcEvent,
-    pub tx_hash: Option<String>
+    pub tx_hash: Option<String>,
 }
 
 impl From<NewBlock> for IbcEventWithHash {
     fn from(nb: NewBlock) -> Self {
         Self {
             event: nb.into(), // from `NewBlock` into `IbcEvent::NewBlock`
-            tx_hash: None   // no hash associated here
+            tx_hash: None,    // no hash associated here
         }
     }
 }
@@ -81,11 +81,13 @@ pub fn get_all_events(
                     action.1 as usize,
                     events.clone(),
                 )) {
-
-                    vals.push((height, IbcEventWithHash {
-                        event,
-                        tx_hash: tx_hash_raw.clone(),
-                    }));
+                    vals.push((
+                        height,
+                        IbcEventWithHash {
+                            event,
+                            tx_hash: tx_hash_raw.clone(),
+                        },
+                    ));
                 }
             }
         }

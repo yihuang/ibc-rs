@@ -20,12 +20,12 @@ use tendermint_rpc::{
 
 use ibc::{events::IbcEvent, ics02_client::height::Height, ics24_host::identifier::ChainId};
 
+use crate::event::rpc::IbcEventWithHash;
 use crate::util::{
     retry::{retry_count, retry_with_index, RetryResult},
     stream::group_while,
 };
 use itertools::Itertools;
-use crate::event::rpc::IbcEventWithHash;
 
 mod retry_strategy {
     use crate::util::retry::clamp_total;
@@ -377,14 +377,24 @@ impl EventMonitor {
 }
 
 /// Collect the IBC events from an RPC event
-fn collect_events(chain_id: &ChainId, event: RpcEvent) -> impl Stream<Item = (Height, IbcEventWithHash)> {
+fn collect_events(
+    chain_id: &ChainId,
+    event: RpcEvent,
+) -> impl Stream<Item = (Height, IbcEventWithHash)> {
     let q = event.query.clone();
     let events = crate::event::rpc::get_all_events(chain_id, event).unwrap_or_default();
 
     if chain_id.as_str() == "ibc-1" {
         let s = events.iter().map(|(_, e)| e).join(",");
         let hs = events.iter().map(|(h, _)| h).join(",");
-        info!("\t [0--monitor@{}] event.query {} -> vals length: {}, summary: {} <> {}", chain_id, q, events.len(), s, hs);
+        info!(
+            "\t [0--monitor@{}] event.query {} -> vals length: {}, summary: {} <> {}",
+            chain_id,
+            q,
+            events.len(),
+            s,
+            hs
+        );
     }
 
     stream::iter(events)

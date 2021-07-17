@@ -70,7 +70,9 @@ impl ChannelWorker {
 
                                 retry_with_index(
                                     retry_strategy::worker_default_strategy(),
-                                    |index| handshake_channel.step_event(event.event.clone(), index),
+                                    |index| {
+                                        handshake_channel.step_event(event.event.clone(), index)
+                                    },
                                 )
                             }
                             None => Ok(()),
