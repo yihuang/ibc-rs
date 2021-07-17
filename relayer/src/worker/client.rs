@@ -101,7 +101,9 @@ impl ClientWorker {
                 trace!("[{}] worker received batch: {:?}", client, batch);
 
                 for event in batch.events {
-                    if let IbcEvent::UpdateClient(update) = event {
+                    // safe to ignore the tx hash
+                    let client_event = event.event;
+                    if let IbcEvent::UpdateClient(update) = client_event {
                         debug!("[{}] client was updated", client);
 
                         // Run misbehaviour. If evidence submitted the loop will exit in next

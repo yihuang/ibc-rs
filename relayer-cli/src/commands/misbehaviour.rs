@@ -61,7 +61,7 @@ pub fn monitor_misbehaviour(
         match event_batch {
             Ok(event_batch) => {
                 for event in event_batch.events {
-                    match event {
+                    match event.event {
                         IbcEvent::UpdateClient(update) => {
                             debug!("{:?}", update);
                             misbehaviour_handling(
@@ -78,7 +78,7 @@ pub fn monitor_misbehaviour(
 
                         IbcEvent::ClientMisbehaviour(ref _misbehaviour) => {
                             // TODO - submit misbehaviour to the witnesses (our full node)
-                            return Ok(Some(event));
+                            return Ok(Some(event.event));
                         }
 
                         _ => {}

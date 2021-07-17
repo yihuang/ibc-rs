@@ -8,12 +8,13 @@ use crossbeam_channel::Sender;
 use tracing::trace;
 
 use ibc::{
-    events::IbcEvent, ics02_client::events::NewBlock, ics24_host::identifier::ChainId, Height,
+    ics02_client::events::NewBlock, ics24_host::identifier::ChainId, Height,
 };
 
 use crate::{event::monitor::EventBatch, object::Object};
 
 use super::{WorkerCmd, WorkerId};
+use crate::event::rpc::IbcEventWithHash;
 
 /// Handle to a [`Worker`], for sending [`WorkerCmd`]s to it.
 pub struct WorkerHandle {
@@ -51,7 +52,7 @@ impl WorkerHandle {
     pub fn send_events(
         &self,
         height: Height,
-        events: Vec<IbcEvent>,
+        events: Vec<IbcEventWithHash>,
         chain_id: ChainId,
     ) -> Result<(), BoxError> {
         let batch = EventBatch {

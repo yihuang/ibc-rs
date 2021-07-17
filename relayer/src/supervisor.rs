@@ -44,6 +44,7 @@ pub mod cmd;
 use cmd::{CmdEffect, ConfigUpdate, SupervisorCmd};
 
 use self::spawn::SpawnMode;
+use crate::event::rpc::IbcEventWithHash;
 
 type ArcBatch = Arc<event::monitor::Result<EventBatch>>;
 type Subscription = Receiver<ArcBatch>;
@@ -188,16 +189,16 @@ impl Supervisor {
             .expect("poisoned lock")
             .handshake_enabled();
 
-        for event in batch.events {
-            match event {
+        for ewh in batch.events {
+            match ewh.event {
                 IbcEvent::NewBlock(_) => {
-                    collected.new_block = Some(event);
+                    collected.new_block = Some(ewh);
                 }
                 IbcEvent::UpdateClient(ref update) => {
                     if let Ok(object) = Object::for_update_client(update, src_chain) {
                         // Collect update client events only if the worker exists
                         if self.workers.contains(&object) {
-                            collected.per_object.entry(object).or_default().push(event);
+                            collected.per_object.entry(object).or_default().push(ewh);
                         }
                     }
                 }
@@ -208,12 +209,12 @@ impl Supervisor {
                         continue;
                     }
 
-                    let object = event
+                    let object = ewh.event
                         .connection_attributes()
                         .map(|attr| Object::connection_from_conn_open_events(attr, src_chain));
 
                     if let Some(Ok(object)) = object {
-                        collected.per_object.entry(object).or_default().push(event);
+                        collected.per_object.entry(object).or_default().push(ewh);
                     }
                 }
                 IbcEvent::OpenInitChannel(..) | IbcEvent::OpenTryChannel(..) => {
@@ -221,12 +222,12 @@ impl Supervisor {
                         continue;
                     }
 
-                    let object = event
+                    let object = ewh.event
                         .channel_attributes()
                         .map(|attr| Object::channel_from_chan_open_events(attr, src_chain));
 
                     if let Some(Ok(object)) = object {
-                        collected.per_object.entry(object).or_default().push(event);
+                        collected.per_object.entry(object).or_default().push(ewh);
                     }
                 }
                 IbcEvent::OpenAckChannel(ref open_ack) => {
@@ -238,7 +239,7 @@ impl Supervisor {
                             .per_object
                             .entry(client_object)
                             .or_default()
-                            .push(event.clone());
+                            .push(ewh.clone());
                     }
 
                     if let Ok(packet_object) =
@@ -248,7 +249,7 @@ impl Supervisor {
                             .per_object
                             .entry(packet_object)
                             .or_default()
-                            .push(event.clone());
+                            .push(ewh.clone());
                     }
 
                     // If handshake message relaying is enabled create worker to send the MsgChannelOpenConfirm message
@@ -260,7 +261,7 @@ impl Supervisor {
                                 .per_object
                                 .entry(channel_object)
                                 .or_default()
-                                .push(event);
+                                .push(ewh);
                         }
                     }
                 }
@@ -273,7 +274,7 @@ impl Supervisor {
                             .per_object
                             .entry(client_object)
                             .or_default()
-                            .push(event.clone());
+                            .push(ewh.clone());
                     }
                     if let Ok(packet_object) =
                         Object::packet_from_chan_open_events(open_confirm.attributes(), src_chain)
@@ -282,27 +283,27 @@ impl Supervisor {
                             .per_object
                             .entry(packet_object)
                             .or_default()
-                            .push(event.clone());
+                            .push(ewh.clone());
                     }
                 }
                 IbcEvent::SendPacket(ref packet) => {
                     if let Ok(object) = Object::for_send_packet(packet, src_chain) {
-                        collected.per_object.entry(object).or_default().push(event);
+                        collected.per_object.entry(object).or_default().push(ewh);
                     }
                 }
                 IbcEvent::TimeoutPacket(ref packet) => {
                     if let Ok(object) = Object::for_timeout_packet(packet, src_chain) {
-                        collected.per_object.entry(object).or_default().push(event);
+                        collected.per_object.entry(object).or_default().push(ewh);
                     }
                 }
                 IbcEvent::WriteAcknowledgement(ref packet) => {
                     if let Ok(object) = Object::for_write_ack(packet, src_chain) {
-                        collected.per_object.entry(object).or_default().push(event);
+                        collected.per_object.entry(object).or_default().push(ewh);
                     }
                 }
                 IbcEvent::CloseInitChannel(ref packet) => {
                     if let Ok(object) = Object::for_close_init_channel(packet, src_chain) {
-                        collected.per_object.entry(object).or_default().push(event);
+                        collected.per_object.entry(object).or_default().push(ewh);
                     }
                 }
                 _ => (),
@@ -557,6 +558,10 @@ impl Supervisor {
 
         let mut collected = self.collect_events(src_chain.clone().as_ref(), batch);
 
+        if chain_id.as_str() == "ibc-1" {
+            info!("\t [2--supervisor@{}] collected events are: {:?}", src_chain.id(), collected);
+        }
+
         for (object, events) in collected.per_object.drain() {
             if !self.relay_on_object(&src_chain.id(), &object) {
                 trace!(
@@ -584,7 +589,7 @@ impl Supervisor {
         }
 
         // If there is a NewBlock event, forward the event to any workers affected by it.
-        if let Some(IbcEvent::NewBlock(new_block)) = collected.new_block {
+        if let Some(IbcEvent::NewBlock(new_block)) = collected.new_block.map(|ewh| ewh.event) {
             for worker in self.workers.to_notify(&src_chain.id()) {
                 worker.send_new_block(height, new_block)?;
             }
@@ -602,9 +607,9 @@ pub struct CollectedEvents {
     /// The chain from which the events were emitted.
     pub chain_id: ChainId,
     /// [`NewBlock`] event collected from the [`EventBatch`].
-    pub new_block: Option<IbcEvent>,
+    pub new_block: Option<IbcEventWithHash>,
     /// Mapping between [`Object`]s and their associated [`IbcEvent`]s.
-    pub per_object: HashMap<Object, Vec<IbcEvent>>,
+    pub per_object: HashMap<Object, Vec<IbcEventWithHash>>,
 }
 
 impl CollectedEvents {

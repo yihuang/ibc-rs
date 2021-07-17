@@ -24,6 +24,8 @@ use crate::util::{
     retry::{retry_count, retry_with_index, RetryResult},
     stream::group_while,
 };
+use itertools::Itertools;
+use crate::event::rpc::IbcEventWithHash;
 
 mod retry_strategy {
     use crate::util::retry::clamp_total;
@@ -72,7 +74,7 @@ pub enum Error {
 pub struct EventBatch {
     pub chain_id: ChainId,
     pub height: Height,
-    pub events: Vec<IbcEvent>,
+    pub events: Vec<IbcEventWithHash>,
 }
 
 pub trait UnwrapOrClone {
@@ -375,8 +377,16 @@ impl EventMonitor {
 }
 
 /// Collect the IBC events from an RPC event
-fn collect_events(chain_id: &ChainId, event: RpcEvent) -> impl Stream<Item = (Height, IbcEvent)> {
+fn collect_events(chain_id: &ChainId, event: RpcEvent) -> impl Stream<Item = (Height, IbcEventWithHash)> {
+    let q = event.query.clone();
     let events = crate::event::rpc::get_all_events(chain_id, event).unwrap_or_default();
+
+    if chain_id.as_str() == "ibc-1" {
+        let s = events.iter().map(|(_, e)| e).join(",");
+        let hs = events.iter().map(|(h, _)| h).join(",");
+        info!("\t [0--monitor@{}] event.query {} -> vals length: {}, summary: {} <> {}", chain_id, q, events.len(), s, hs);
+    }
+
     stream::iter(events)
 }
 
@@ -406,6 +416,10 @@ fn stream_batches(
         let mut events = events.into_iter().map(|(_, e)| e).collect();
         sort_events(&mut events);
 
+        if chain_id.as_str() == "ibc-1" {
+            info!("\t [1--monitor@{}] event batch: {:?}", chain_id, events);
+        }
+
         EventBatch {
             height,
             events,
@@ -416,8 +430,8 @@ fn stream_batches(
 
 /// Sort the given events by putting the NewBlock event first,
 /// and leaving the other events as is.
-fn sort_events(events: &mut Vec<IbcEvent>) {
-    events.sort_by(|a, b| match (a, b) {
+fn sort_events(events: &mut Vec<IbcEventWithHash>) {
+    events.sort_by(|a, b| match (&a.event, &b.event) {
         (IbcEvent::NewBlock(_), _) => Ordering::Less,
         _ => Ordering::Equal,
     })

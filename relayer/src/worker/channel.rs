@@ -65,12 +65,12 @@ impl ChannelWorker {
                                 let mut handshake_channel = RelayChannel::restore_from_event(
                                     a_chain.clone(),
                                     b_chain.clone(),
-                                    event.clone(),
+                                    event.event.clone(),
                                 )?;
 
                                 retry_with_index(
                                     retry_strategy::worker_default_strategy(),
-                                    |index| handshake_channel.step_event(event.clone(), index),
+                                    |index| handshake_channel.step_event(event.event.clone(), index),
                                 )
                             }
                             None => Ok(()),

@@ -2,6 +2,8 @@ use std::{collections::HashMap, convert::TryFrom};
 
 use anomaly::BoxError;
 use tendermint_rpc::event::{Event as RpcEvent, EventData as RpcEventData};
+use tracing::info;
+use itertools::Itertools;
 
 use ibc::ics02_client::events::NewBlock;
 use ibc::ics02_client::height::Height;
@@ -13,14 +15,37 @@ use ibc::{
     ics04_channel::events as ChannelEvents,
 };
 
+#[derive(Debug, Clone)]
+pub struct IbcEventWithHash {
+    pub event: IbcEvent,
+    pub tx_hash: Option<String>
+}
+
+impl From<NewBlock> for IbcEventWithHash {
+    fn from(nb: NewBlock) -> Self {
+        Self {
+            event: nb.into(), // from `NewBlock` into `IbcEvent::NewBlock`
+            tx_hash: None   // no hash associated here
+        }
+    }
+}
+
+impl std::fmt::Display for IbcEventWithHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}%{:?}", self.event, self.tx_hash)
+    }
+}
+
 pub fn get_all_events(
     chain_id: &ChainId,
     result: RpcEvent,
-) -> Result<Vec<(Height, IbcEvent)>, String> {
-    let mut vals: Vec<(Height, IbcEvent)> = vec![];
+) -> Result<Vec<(Height, IbcEventWithHash)>, String> {
+    let mut vals: Vec<(Height, IbcEventWithHash)> = vec![];
 
     match &result.data {
         RpcEventData::NewBlock { block, .. } => {
+            // info!("\t newblock looks like this: {:?}", result);
+
             let height = Height::new(
                 ChainId::chain_version(chain_id.to_string().as_str()),
                 u64::from(block.as_ref().ok_or("tx.height")?.header.height),
@@ -38,8 +63,17 @@ pub fn get_all_events(
                 ChainId::chain_version(chain_id.to_string().as_str()),
                 height_raw,
             );
+            let pre_tx_hash = events.get("tx.hash");
+            if let Some(hs) = pre_tx_hash {
+                let d = hs.iter().join(",");
+                info!("\t\t\t *** found tx hash(es) {}", d);
+                info!("DUMP: {:#?}", events);
+            }
+            let tx_hash_raw = pre_tx_hash.map(|hv| hv.first()).flatten().cloned();
 
             let actions_and_indices = extract_helper(events)?;
+            // info!("\t actions & indices: {:?}", actions_and_indices);
+            // info!("\t events: {:?}", events);
             for action in actions_and_indices {
                 if let Ok(event) = build_event(RawObject::new(
                     height,
@@ -47,7 +81,11 @@ pub fn get_all_events(
                     action.1 as usize,
                     events.clone(),
                 )) {
-                    vals.push((height, event));
+
+                    vals.push((height, IbcEventWithHash {
+                        event,
+                        tx_hash: tx_hash_raw.clone(),
+                    }));
                 }
             }
         }
