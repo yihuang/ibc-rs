@@ -113,6 +113,7 @@ impl ClientState {
 
     /// Helper function to verify the upgrade client procedure.
     /// Resets all fields except the blockchain-specific ones.
+    #[deprecated]
     pub fn zero_custom_fields(mut client_state: Self) -> Self {
         client_state.trusting_period = ZERO_DURATION;
         client_state.trust_level = TrustThresholdFraction::default();
@@ -132,6 +133,28 @@ impl ClientState {
     /// state timestamp
     pub fn expired(&self, elapsed: Duration) -> bool {
         elapsed > self.trusting_period
+    }
+}
+
+pub fn zero_custom_fields_encode(mut client_state: RawClientState) -> prost_types::Any {
+    use crate::ics02_client::client_state::TENDERMINT_CLIENT_STATE_TYPE_URL;
+
+    client_state.trusting_period = Some(ZERO_DURATION.into());
+    client_state.trust_level = Some(Fraction {
+        numerator: 0,
+        denominator: 0,
+    });
+    client_state.allow_update_after_expiry = false;
+    client_state.allow_update_after_misbehaviour = false;
+    client_state.frozen_height = Some(Height::zero().into());
+    client_state.max_clock_drift = Some(ZERO_DURATION.into());
+
+    let mut buf = vec![];
+    prost::Message::encode(&client_state, &mut buf).expect("encoding to `Any` from `ClientState`");
+
+    prost_types::Any {
+        type_url: TENDERMINT_CLIENT_STATE_TYPE_URL.to_string(),
+        value: buf,
     }
 }
 
