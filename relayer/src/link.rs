@@ -1284,25 +1284,66 @@ impl RelayPath {
         }
     }
 
+    // Try to execute an iterated list of `OperationData`. Returns the following:
+    //   - A summary of processed data,
+    //   - A vector of unprocessed data, either because:
+    //       - The scheduled time has not elapsed, or
+    //       - An error has occured before or during the processing of the given operation
+    //   - An optional LinkError, which is returned if any error occurred.
+    fn do_execute_schedule<I: Iterator<Item = OperationalData>>
+        (&mut self, mut operations: I) ->
+        (RelaySummary, Vec<OperationalData>, Option<LinkError>)
+    {
+        let connection_delay = self.channel.connection_delay;
+        let mut summaries = RelaySummary::empty();
+        let mut unprocessed = vec![];
+
+        while let Some(operation) = operations.next() {
+            if operation.scheduled_time.elapsed() > connection_delay {
+                match self.relay_from_operational_data(operation.clone()) {
+                    Ok(summary) => {
+                        summaries.extend(summary);
+                    }
+                    Err(e) => {
+                        unprocessed.push(operation);
+                        unprocessed.extend(operations);
+
+                        return (summaries, unprocessed, Some(e));
+                    }
+                }
+            } else {
+                unprocessed.push(operation);
+            }
+        }
+
+        (summaries, unprocessed, None)
+    }
+
     /// Checks if there is any operational data items ready,
     /// and if so performs the relaying of corresponding packets
     /// to the target chain.
     pub fn execute_schedule(&mut self) -> Result<RelaySummary, LinkError> {
-        let mut summary = RelaySummary::empty();
+        let mut dst_operational_data = core::mem::take(&mut self.dst_operational_data);
+        let (mut dst_summaries, dst_unprocessed, err) =
+            self.do_execute_schedule(dst_operational_data.drain(0..));
+        self.dst_operational_data = dst_unprocessed;
 
-        // Handle first messages heading to the destination chain.
-        let dst_od = self.try_fetch_scheduled_operational_data_dst();
-        if let Some(od) = dst_od {
-            summary.extend(self.relay_from_operational_data(od)?);
+        if let Some(e) = err {
+            return Err(e)
         }
 
-        // Now handle messages heading to the source chain.
-        let src_od = self.try_fetch_scheduled_operational_data_src();
-        if let Some(od) = src_od {
-            summary.extend(self.relay_from_operational_data(od)?);
+        let mut src_operational_data = core::mem::take(&mut self.src_operational_data);
+        let (src_summaries, src_unprocessed, err) =
+            self.do_execute_schedule(src_operational_data.drain(0..));
+        self.src_operational_data = src_unprocessed;
+
+        if let Some(e) = err {
+            return Err(e)
         }
 
-        Ok(summary)
+        dst_summaries.extend(src_summaries);
+
+        Ok(dst_summaries)
     }
 
     /// Refreshes the scheduled batches.
@@ -1427,44 +1468,6 @@ impl RelayPath {
         };
 
         Ok(())
-    }
-
-    /// Destination-chain fetching of operational data.
-    ///
-    /// Pulls out an operational elements with elapsed delay period and that can
-    /// now be processed. Does not block: if no OD fulfilled the delay period (or none is
-    /// scheduled), returns immediately with `None`.
-    fn try_fetch_scheduled_operational_data_dst(&mut self) -> Option<OperationalData> {
-        // Check if the delay elapsed for some item, and return its position.
-        let found = self
-            .dst_operational_data
-            .iter()
-            .position(|op| op.scheduled_time.elapsed() > self.channel.connection_delay);
-
-        if let Some(pos) = found {
-            let item = self.dst_operational_data.remove(pos);
-            Some(item)
-        } else {
-            None
-        }
-    }
-
-    /// Source-chain fetching of operational data.
-    ///
-    /// Equivalent to [`try_fetch_scheduled_operational_data_dst`]
-    /// but for the source chain operational data.
-    fn try_fetch_scheduled_operational_data_src(&mut self) -> Option<OperationalData> {
-        let found = self
-            .src_operational_data
-            .iter()
-            .position(|op| op.scheduled_time.elapsed() > self.channel.connection_delay);
-
-        if let Some(pos) = found {
-            let item = self.src_operational_data.remove(pos);
-            Some(item)
-        } else {
-            None
-        }
     }
 
     /// Fetches an operational data that has fulfilled its predefined delay period. May _block_
