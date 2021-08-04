@@ -1,12 +1,10 @@
-use std::{
-    fmt::{self, Debug},
-    sync::Arc,
-};
-
+use core::convert::{From, Into};
+use core::fmt::{self, Debug, Display};
 use crossbeam_channel as channel;
 use ibc::ics03_connection::connection::IdentifiedConnectionEnd;
 use ibc_proto::ibc::core::connection::v1::QueryConnectionsRequest;
 use serde::Serialize;
+use std::sync::Arc;
 
 use ibc::{
     events::IbcEvent,
@@ -23,7 +21,7 @@ use ibc::{
         packet::{PacketMsgType, Sequence},
     },
     ics23_commitment::commitment::CommitmentPrefix,
-    ics24_host::identifier::{ChainId, ChannelId, ClientId, ConnectionId, PortId},
+    ics24_host::identifier::{ChainId, ChannelId, ClientId, ConnectionId, HostChain, PortId},
     proofs::Proofs,
     query::QueryTxRequest,
     signer::Signer,
@@ -300,7 +298,7 @@ pub enum ChainRequest {
     },
 }
 
-pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
+pub trait ChainHandle: HostChain + Clone + Send + Sync + Serialize + Debug {
     fn new(chain_id: ChainId, sender: channel::Sender<ChainRequest>) -> Self;
 
     /// Get the [`ChainId`] of this chain.
@@ -320,9 +318,9 @@ pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
 
     fn get_key(&self) -> Result<KeyEntry, Error>;
 
-    fn module_version(&self, port_id: &PortId) -> Result<String, Error>;
+    fn module_version(&self, port_id: &Self::PortId) -> Result<String, Error>;
 
-    fn query_latest_height(&self) -> Result<Height, Error>;
+    fn query_latest_height(&self) -> Result<Self::Height, Error>;
 
     fn query_clients(
         &self,
@@ -331,14 +329,14 @@ pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
 
     fn query_client_state(
         &self,
-        client_id: &ClientId,
-        height: Height,
+        client_id: &Self::ClientId,
+        height: Self::Height,
     ) -> Result<AnyClientState, Error>;
 
     fn query_client_connections(
         &self,
         request: QueryClientConnectionsRequest,
-    ) -> Result<Vec<ConnectionId>, Error>;
+    ) -> Result<Vec<Self::ConnectionId>, Error>;
 
     fn query_consensus_states(
         &self,
@@ -347,19 +345,19 @@ pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
 
     fn query_consensus_state(
         &self,
-        client_id: ClientId,
-        consensus_height: Height,
-        query_height: Height,
+        client_id: Self::ClientId,
+        consensus_height: Self::Height,
+        query_height: Self::Height,
     ) -> Result<AnyConsensusState, Error>;
 
     fn query_upgraded_client_state(
         &self,
-        height: Height,
+        height: Self::Height,
     ) -> Result<(AnyClientState, MerkleProof), Error>;
 
     fn query_upgraded_consensus_state(
         &self,
-        height: Height,
+        height: Self::Height,
     ) -> Result<(AnyConsensusState, MerkleProof), Error>;
 
     fn query_commitment_prefix(&self) -> Result<CommitmentPrefix, Error>;
@@ -368,8 +366,8 @@ pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
 
     fn query_connection(
         &self,
-        connection_id: &ConnectionId,
-        height: Height,
+        connection_id: &Self::ConnectionId,
+        height: Self::Height,
     ) -> Result<ConnectionEnd, Error>;
 
     fn query_connections(
@@ -394,9 +392,9 @@ pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
 
     fn query_channel(
         &self,
-        port_id: &PortId,
-        channel_id: &ChannelId,
-        height: Height,
+        port_id: &Self::PortId,
+        channel_id: &Self::ChannelId,
+        height: Self::Height,
     ) -> Result<ChannelEnd, Error>;
 
     fn query_channel_client_state(
@@ -406,38 +404,38 @@ pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
 
     fn proven_client_state(
         &self,
-        client_id: &ClientId,
-        height: Height,
+        client_id: &Self::ClientId,
+        height: Self::Height,
     ) -> Result<(AnyClientState, MerkleProof), Error>;
 
     fn proven_connection(
         &self,
-        connection_id: &ConnectionId,
-        height: Height,
+        connection_id: &Self::ConnectionId,
+        height: Self::Height,
     ) -> Result<(ConnectionEnd, MerkleProof), Error>;
 
     fn proven_client_consensus(
         &self,
-        client_id: &ClientId,
-        consensus_height: Height,
-        height: Height,
+        client_id: &Self::ClientId,
+        consensus_height: Self::Height,
+        height: Self::Height,
     ) -> Result<(AnyConsensusState, MerkleProof), Error>;
 
     fn build_header(
         &self,
-        trusted_height: Height,
-        target_height: Height,
+        trusted_height: Self::Height,
+        target_height: Self::Height,
         client_state: AnyClientState,
     ) -> Result<(AnyHeader, Vec<AnyHeader>), Error>;
 
     /// Constructs a client state at the given height
-    fn build_client_state(&self, height: Height) -> Result<AnyClientState, Error>;
+    fn build_client_state(&self, height: Self::Height) -> Result<AnyClientState, Error>;
 
     /// Constructs a consensus state at the given height
     fn build_consensus_state(
         &self,
-        trusted: Height,
-        target: Height,
+        trusted: Self::Height,
+        target: Self::Height,
         client_state: AnyClientState,
     ) -> Result<AnyConsensusState, Error>;
 
@@ -450,31 +448,31 @@ pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
     fn build_connection_proofs_and_client_state(
         &self,
         message_type: ConnectionMsgType,
-        connection_id: &ConnectionId,
-        client_id: &ClientId,
-        height: Height,
+        connection_id: &Self::ConnectionId,
+        client_id: &Self::ClientId,
+        height: Self::Height,
     ) -> Result<(Option<AnyClientState>, Proofs), Error>;
 
     fn build_channel_proofs(
         &self,
-        port_id: &PortId,
-        channel_id: &ChannelId,
-        height: Height,
+        port_id: &Self::PortId,
+        channel_id: &Self::ChannelId,
+        height: Self::Height,
     ) -> Result<Proofs, Error>;
 
     fn build_packet_proofs(
         &self,
         packet_type: PacketMsgType,
-        port_id: &PortId,
-        channel_id: &ChannelId,
-        sequence: Sequence,
-        height: Height,
+        port_id: &Self::PortId,
+        channel_id: &Self::ChannelId,
+        sequence: Self::Sequence,
+        height: Self::Height,
     ) -> Result<(Vec<u8>, Proofs), Error>;
 
     fn query_packet_commitments(
         &self,
         request: QueryPacketCommitmentsRequest,
-    ) -> Result<(Vec<PacketState>, Height), Error>;
+    ) -> Result<(Vec<PacketState>, Self::Height), Error>;
 
     fn query_unreceived_packets(
         &self,
@@ -484,7 +482,7 @@ pub trait ChainHandle: Clone + Send + Sync + Serialize + Debug {
     fn query_packet_acknowledgements(
         &self,
         request: QueryPacketAcknowledgementsRequest,
-    ) -> Result<(Vec<PacketState>, Height), Error>;
+    ) -> Result<(Vec<PacketState>, Self::Height), Error>;
 
     fn query_unreceived_acknowledgement(
         &self,

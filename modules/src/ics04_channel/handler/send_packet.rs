@@ -4,24 +4,26 @@ use crate::ics02_client::client_state::ClientState;
 use crate::ics04_channel::channel::Counterparty;
 use crate::ics04_channel::channel::State;
 use crate::ics04_channel::events::SendPacket;
-use crate::ics04_channel::packet::{PacketResult, Sequence};
+use crate::ics04_channel::packet::PacketResult;
 use crate::ics04_channel::{context::ChannelReader, error::Error, packet::Packet};
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::HostChain;
 use crate::timestamp::{Expiry, Timestamp};
-use crate::Height;
 
 #[derive(Clone, Debug)]
-pub struct SendPacketResult {
-    pub port_id: PortId,
-    pub channel_id: ChannelId,
-    pub seq: Sequence,
-    pub seq_number: Sequence,
-    pub timeout_height: Height,
+pub struct SendPacketResult<Chain: HostChain> {
+    pub port_id: Chain::PortId,
+    pub channel_id: Chain::ChannelId,
+    pub seq: Chain::Sequence,
+    pub seq_number: Chain::Sequence,
+    pub timeout_height: Chain::Height,
     pub timeout_timestamp: Timestamp,
     pub data: Vec<u8>,
 }
 
-pub fn send_packet(ctx: &dyn ChannelReader, packet: Packet) -> HandlerResult<PacketResult, Error> {
+pub fn send_packet<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
+    packet: Packet,
+) -> HandlerResult<PacketResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     let source_channel_end = ctx
@@ -135,7 +137,7 @@ mod tests {
     use crate::ics04_channel::handler::send_packet::send_packet;
     use crate::ics04_channel::packet::test_utils::get_dummy_raw_packet;
     use crate::ics04_channel::packet::Packet;
-    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, IdentityChain, PortId};
     use crate::mock::context::MockContext;
     use crate::timestamp::ZERO_DURATION;
 
@@ -143,7 +145,7 @@ mod tests {
     fn send_packet_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
+            ctx: MockContext<IdentityChain>,
             packet: Packet,
             want_pass: bool,
         }

@@ -9,11 +9,12 @@ use crate::ics04_channel::events::Attributes;
 use crate::ics04_channel::handler::verify::verify_channel_proofs;
 use crate::ics04_channel::handler::{ChannelIdState, ChannelResult};
 use crate::ics04_channel::msgs::chan_open_ack::MsgChannelOpenAck;
+use crate::ics24_host::identifier::HostChain;
 
-pub(crate) fn process(
-    ctx: &dyn ChannelReader,
+pub(crate) fn process<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     msg: MsgChannelOpenAck,
-) -> HandlerResult<ChannelResult, Error> {
+) -> HandlerResult<ChannelResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     // Unwrap the old channel end and validate it against the message.
@@ -126,7 +127,7 @@ mod tests {
     use crate::ics04_channel::msgs::chan_open_try::test_util::get_dummy_raw_msg_chan_open_try;
     use crate::ics04_channel::msgs::chan_open_try::MsgChannelOpenTry;
     use crate::ics04_channel::msgs::ChannelMsg;
-    use crate::ics24_host::identifier::ConnectionId;
+    use crate::ics24_host::identifier::{ConnectionId, IdentityChain};
     use crate::mock::context::MockContext;
     use crate::Height;
 
@@ -136,8 +137,8 @@ mod tests {
     fn chan_open_ack_msg_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
-            msg: ChannelMsg,
+            ctx: MockContext<IdentityChain>,
+            msg: ChannelMsg<IdentityChain>,
             want_pass: bool,
         }
         let proof_height = 10;

@@ -5,15 +5,15 @@ use crate::ics04_channel::channel::ChannelEnd;
 use crate::ics04_channel::context::ChannelReader;
 use crate::ics04_channel::error::Error;
 use crate::ics04_channel::packet::{Packet, Sequence};
-use crate::ics24_host::identifier::ClientId;
+use crate::ics24_host::identifier::{ClientId, HostChain};
 use crate::proofs::Proofs;
 
 /// Entry point for verifying all proofs bundled in any ICS4 message for channel protocols.
-pub fn verify_channel_proofs(
-    ctx: &dyn ChannelReader,
-    channel_end: &ChannelEnd,
-    connection_end: &ConnectionEnd,
-    expected_chan: &ChannelEnd,
+pub fn verify_channel_proofs<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
+    channel_end: &ChannelEnd<Chain>,
+    connection_end: &ConnectionEnd<Chain>,
+    expected_chan: &ChannelEnd<Chain>,
     proofs: &Proofs,
 ) -> Result<(), Error> {
     // This is the client which will perform proof verification.
@@ -56,8 +56,8 @@ pub fn verify_channel_proofs(
 }
 
 /// Entry point for verifying all proofs bundled in a ICS4 packet recv. message.
-pub fn verify_packet_recv_proofs(
-    ctx: &dyn ChannelReader,
+pub fn verify_packet_recv_proofs<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     packet: &Packet,
     client_id: ClientId,
     proofs: &Proofs,
@@ -106,8 +106,8 @@ pub fn verify_packet_recv_proofs(
 }
 
 /// Entry point for verifying all proofs bundled in an ICS4 packet ack message.
-pub fn verify_packet_acknowledgement_proofs(
-    ctx: &dyn ChannelReader,
+pub fn verify_packet_acknowledgement_proofs<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     packet: &Packet,
     acknowledgement: Vec<u8>,
     client_id: ClientId,
@@ -141,8 +141,8 @@ pub fn verify_packet_acknowledgement_proofs(
 }
 
 /// Entry point for verifying all timeout proofs.
-pub fn verify_next_sequence_recv(
-    ctx: &dyn ChannelReader,
+pub fn verify_next_sequence_recv<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     client_id: ClientId,
     packet: Packet,
     seq: Sequence,
@@ -174,8 +174,8 @@ pub fn verify_next_sequence_recv(
     Ok(())
 }
 
-pub fn verify_packet_receipt_absence(
-    ctx: &dyn ChannelReader,
+pub fn verify_packet_receipt_absence<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     client_id: ClientId,
     packet: Packet,
     proofs: &Proofs,

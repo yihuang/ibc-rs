@@ -9,6 +9,7 @@ use crate::ics04_channel::msgs::chan_open_ack::MsgChannelOpenAck;
 use crate::ics04_channel::msgs::chan_open_confirm::MsgChannelOpenConfirm;
 use crate::ics04_channel::msgs::chan_open_init::MsgChannelOpenInit;
 use crate::ics04_channel::msgs::chan_open_try::MsgChannelOpenTry;
+use crate::ics24_host::identifier::HostChain;
 
 use self::{recv_packet::MsgRecvPacket, timeout::MsgTimeout, timeout_on_close::MsgTimeoutOnClose};
 
@@ -30,9 +31,9 @@ pub mod timeout_on_close;
 
 /// Enumeration of all possible messages that the ICS4 protocol processes.
 #[derive(Clone, Debug, PartialEq)]
-pub enum ChannelMsg {
-    ChannelOpenInit(MsgChannelOpenInit),
-    ChannelOpenTry(MsgChannelOpenTry),
+pub enum ChannelMsg<Chain: HostChain> {
+    ChannelOpenInit(MsgChannelOpenInit<Chain>),
+    ChannelOpenTry(MsgChannelOpenTry<Chain>),
     ChannelOpenAck(MsgChannelOpenAck),
     ChannelOpenConfirm(MsgChannelOpenConfirm),
     ChannelCloseInit(MsgChannelCloseInit),

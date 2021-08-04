@@ -7,20 +7,23 @@ use crate::ics04_channel::handler::verify::{
     verify_next_sequence_recv, verify_packet_receipt_absence,
 };
 use crate::ics04_channel::msgs::timeout::MsgTimeout;
-use crate::ics04_channel::packet::{PacketResult, Sequence};
+use crate::ics04_channel::packet::PacketResult;
 use crate::ics04_channel::{context::ChannelReader, error::Error};
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::HostChain;
 use crate::timestamp::Expiry;
 
 #[derive(Clone, Debug)]
-pub struct TimeoutPacketResult {
-    pub port_id: PortId,
-    pub channel_id: ChannelId,
-    pub seq: Sequence,
-    pub channel: Option<ChannelEnd>,
+pub struct TimeoutPacketResult<Chain: HostChain> {
+    pub port_id: Chain::PortId,
+    pub channel_id: Chain::ChannelId,
+    pub seq: Chain::Sequence,
+    pub channel: Option<ChannelEnd<Chain>>,
 }
 
-pub fn process(ctx: &dyn ChannelReader, msg: MsgTimeout) -> HandlerResult<PacketResult, Error> {
+pub fn process<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
+    msg: MsgTimeout,
+) -> HandlerResult<PacketResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     let packet = &msg.packet;
@@ -157,7 +160,7 @@ mod tests {
     use crate::ics04_channel::handler::timeout::process;
     use crate::ics04_channel::msgs::timeout::test_util::get_dummy_raw_msg_timeout;
     use crate::ics04_channel::msgs::timeout::MsgTimeout;
-    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, IdentityChain, PortId};
     use crate::timestamp::ZERO_DURATION;
 
     use crate::mock::context::MockContext;
@@ -169,7 +172,7 @@ mod tests {
     fn timeout_packet_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
+            ctx: MockContext<IdentityChain>,
             msg: MsgTimeout,
             want_pass: bool,
         }

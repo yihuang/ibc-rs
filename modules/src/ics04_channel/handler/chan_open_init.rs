@@ -9,11 +9,12 @@ use crate::ics04_channel::events::Attributes;
 use crate::ics04_channel::handler::{ChannelIdState, ChannelResult};
 use crate::ics04_channel::msgs::chan_open_init::MsgChannelOpenInit;
 use crate::ics24_host::identifier::ChannelId;
+use crate::ics24_host::identifier::HostChain;
 
-pub(crate) fn process(
-    ctx: &dyn ChannelReader,
-    msg: MsgChannelOpenInit,
-) -> HandlerResult<ChannelResult, Error> {
+pub(crate) fn process<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
+    msg: MsgChannelOpenInit<Chain>,
+) -> HandlerResult<ChannelResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     // Channel capabilities
@@ -100,15 +101,15 @@ mod tests {
     use crate::ics04_channel::msgs::chan_open_init::test_util::get_dummy_raw_msg_chan_open_init;
     use crate::ics04_channel::msgs::chan_open_init::MsgChannelOpenInit;
     use crate::ics04_channel::msgs::ChannelMsg;
-    use crate::ics24_host::identifier::ConnectionId;
+    use crate::ics24_host::identifier::{ConnectionId, IdentityChain};
     use crate::mock::context::MockContext;
 
     #[test]
     fn chan_open_init_msg_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
-            msg: ChannelMsg,
+            ctx: MockContext<IdentityChain>,
+            msg: ChannelMsg<IdentityChain>,
             want_pass: bool,
         }
 

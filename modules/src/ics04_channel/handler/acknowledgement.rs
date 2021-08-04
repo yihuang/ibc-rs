@@ -9,7 +9,7 @@ use crate::ics04_channel::handler::verify::verify_packet_acknowledgement_proofs;
 use crate::ics04_channel::msgs::acknowledgement::MsgAcknowledgement;
 use crate::ics04_channel::packet::{PacketResult, Sequence};
 use crate::ics04_channel::{context::ChannelReader, error::Error};
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::{ChannelId, HostChain, PortId};
 
 #[derive(Clone, Debug)]
 pub struct AckPacketResult {
@@ -19,10 +19,10 @@ pub struct AckPacketResult {
     pub seq_number: Option<Sequence>,
 }
 
-pub fn process(
-    ctx: &dyn ChannelReader,
+pub fn process<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     msg: MsgAcknowledgement,
-) -> HandlerResult<PacketResult, Error> {
+) -> HandlerResult<PacketResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     let packet = &msg.packet;
@@ -143,7 +143,7 @@ mod tests {
     use crate::ics04_channel::handler::acknowledgement::process;
     use crate::ics04_channel::msgs::acknowledgement::test_util::get_dummy_raw_msg_acknowledgement;
     use crate::ics04_channel::msgs::acknowledgement::MsgAcknowledgement;
-    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, IdentityChain, PortId};
     use crate::mock::context::MockContext;
     use crate::timestamp::ZERO_DURATION;
     use test_env_log::test;
@@ -154,7 +154,7 @@ mod tests {
     fn ack_packet_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
+            ctx: MockContext<IdentityChain>,
             msg: MsgAcknowledgement,
             want_pass: bool,
         }

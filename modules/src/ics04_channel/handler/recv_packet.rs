@@ -9,7 +9,7 @@ use crate::ics04_channel::events::ReceivePacket;
 use crate::ics04_channel::handler::verify::verify_packet_recv_proofs;
 use crate::ics04_channel::msgs::recv_packet::MsgRecvPacket;
 use crate::ics04_channel::packet::{PacketResult, Receipt, Sequence};
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::{ChannelId, HostChain, PortId};
 use crate::timestamp::Expiry;
 
 #[derive(Clone, Debug)]
@@ -21,7 +21,10 @@ pub struct RecvPacketResult {
     pub receipt: Option<Receipt>,
 }
 
-pub fn process(ctx: &dyn ChannelReader, msg: MsgRecvPacket) -> HandlerResult<PacketResult, Error> {
+pub fn process<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Chain,
+    msg: MsgRecvPacket,
+) -> HandlerResult<PacketResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     let packet = &msg.packet;
@@ -153,7 +156,7 @@ mod tests {
     use crate::ics04_channel::msgs::recv_packet::test_util::get_dummy_raw_msg_recv_packet;
     use crate::ics04_channel::msgs::recv_packet::MsgRecvPacket;
     use crate::ics18_relayer::context::Ics18Context;
-    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, IdentityChain, PortId};
     use crate::mock::context::MockContext;
     use crate::test_utils::get_dummy_account_id;
     use crate::timestamp::Timestamp;
@@ -164,7 +167,7 @@ mod tests {
     fn recv_packet_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
+            ctx: MockContext<IdentityChain>,
             msg: MsgRecvPacket,
             want_pass: bool,
         }

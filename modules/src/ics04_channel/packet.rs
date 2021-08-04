@@ -6,7 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 use ibc_proto::ibc::core::channel::v1::Packet as RawPacket;
 
 use crate::ics04_channel::error::Error;
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::{ChannelId, HostChain, PortId};
 use crate::timestamp::{Expiry::Expired, Timestamp};
 use crate::Height;
 
@@ -26,12 +26,12 @@ pub enum PacketMsgType {
 }
 
 #[derive(Clone, Debug)]
-pub enum PacketResult {
-    Send(SendPacketResult),
+pub enum PacketResult<Chain: HostChain> {
+    Send(SendPacketResult<Chain>),
     Recv(RecvPacketResult),
-    WriteAck(WriteAckPacketResult),
+    WriteAck(WriteAckPacketResult<Chain>),
     Ack(AckPacketResult),
-    Timeout(TimeoutPacketResult),
+    Timeout(TimeoutPacketResult<Chain>),
 }
 
 #[derive(Clone, Debug)]

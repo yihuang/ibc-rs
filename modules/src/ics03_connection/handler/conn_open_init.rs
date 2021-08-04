@@ -8,12 +8,12 @@ use crate::ics03_connection::error::Error;
 use crate::ics03_connection::events::Attributes;
 use crate::ics03_connection::handler::{ConnectionIdState, ConnectionResult};
 use crate::ics03_connection::msgs::conn_open_init::MsgConnectionOpenInit;
-use crate::ics24_host::identifier::ConnectionId;
+use crate::ics24_host::identifier::{ConnectionId, HostChain};
 
-pub(crate) fn process(
-    ctx: &dyn ConnectionReader,
-    msg: MsgConnectionOpenInit,
-) -> HandlerResult<ConnectionResult, Error> {
+pub(crate) fn process<Chain: HostChain, Reader: ConnectionReader<Chain>>(
+    ctx: &Reader,
+    msg: MsgConnectionOpenInit<Chain>,
+) -> HandlerResult<ConnectionResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     // An IBC client running on the local (host) chain should exist.
@@ -64,6 +64,7 @@ mod tests {
     use crate::ics03_connection::msgs::conn_open_init::test_util::get_dummy_raw_msg_conn_open_init;
     use crate::ics03_connection::msgs::conn_open_init::MsgConnectionOpenInit;
     use crate::ics03_connection::msgs::ConnectionMsg;
+    use crate::ics24_host::identifier::IdentityChain;
     use crate::mock::context::MockContext;
     use crate::Height;
 
@@ -71,8 +72,8 @@ mod tests {
     fn conn_open_init_msg_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
-            msg: ConnectionMsg,
+            ctx: MockContext<IdentityChain>,
+            msg: ConnectionMsg<IdentityChain>,
             want_pass: bool,
         }
 

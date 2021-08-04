@@ -13,7 +13,7 @@ use crate::ics03_connection::connection::Counterparty;
 use crate::ics03_connection::error::Error;
 use crate::ics03_connection::version::Version;
 use crate::ics23_commitment::commitment::CommitmentProofBytes;
-use crate::ics24_host::identifier::{ClientId, ConnectionId};
+use crate::ics24_host::identifier::HostChain;
 use crate::proofs::{ConsensusProof, Proofs};
 use crate::signer::Signer;
 use crate::tx_msg::Msg;
@@ -25,25 +25,25 @@ pub const TYPE_URL: &str = "/ibc.core.connection.v1.MsgConnectionOpenTry";
 /// Message definition `MsgConnectionOpenTry`  (i.e., `ConnOpenTry` datagram).
 ///
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MsgConnectionOpenTry {
-    pub previous_connection_id: Option<ConnectionId>,
-    pub client_id: ClientId,
+pub struct MsgConnectionOpenTry<Chain: HostChain> {
+    pub previous_connection_id: Option<Chain::ConnectionId>,
+    pub client_id: Chain::ClientId,
     pub client_state: Option<AnyClientState>,
-    pub counterparty: Counterparty,
+    pub counterparty: Counterparty<Chain>,
     pub counterparty_versions: Vec<Version>,
     pub proofs: Proofs,
     pub delay_period: Duration,
     pub signer: Signer,
 }
 
-impl MsgConnectionOpenTry {
+impl<Chain: HostChain> MsgConnectionOpenTry<Chain> {
     /// Getter for accessing the previous connection identifier of this message.
-    pub fn previous_connection_id(&self) -> &Option<ConnectionId> {
+    pub fn previous_connection_id(&self) -> &Option<Chain::ConnectionId> {
         &self.previous_connection_id
     }
 
     /// Getter for accessing the client identifier from this message.
-    pub fn client_id(&self) -> &ClientId {
+    pub fn client_id(&self) -> &Chain::ClientId {
         &self.client_id
     }
 
@@ -53,7 +53,7 @@ impl MsgConnectionOpenTry {
     }
 
     /// Getter for accesing the whole counterparty of this message. Returns a `clone()`.
-    pub fn counterparty(&self) -> Counterparty {
+    pub fn counterparty(&self) -> Counterparty<Chain> {
         self.counterparty.clone()
     }
 
@@ -69,7 +69,7 @@ impl MsgConnectionOpenTry {
 
     /// Getter for accessing the `consensus_height` field from this message. Returns the special
     /// value `0` if this field is not set.
-    pub fn consensus_height(&self) -> Height {
+    pub fn consensus_height(&self) -> Chain::Height {
         match self.proofs.consensus_proof() {
             None => Height::zero(),
             Some(p) => p.height(),
@@ -77,7 +77,7 @@ impl MsgConnectionOpenTry {
     }
 }
 
-impl Msg for MsgConnectionOpenTry {
+impl<Chain: HostChain> Msg for MsgConnectionOpenTry<Chain> {
     type ValidationError = Error;
     type Raw = RawMsgConnectionOpenTry;
 
@@ -90,9 +90,9 @@ impl Msg for MsgConnectionOpenTry {
     }
 }
 
-impl Protobuf<RawMsgConnectionOpenTry> for MsgConnectionOpenTry {}
+impl<Chain: HostChain> Protobuf<RawMsgConnectionOpenTry> for MsgConnectionOpenTry<Chain> {}
 
-impl TryFrom<RawMsgConnectionOpenTry> for MsgConnectionOpenTry {
+impl<Chain: HostChain> TryFrom<RawMsgConnectionOpenTry> for MsgConnectionOpenTry<Chain> {
     type Error = Error;
 
     fn try_from(msg: RawMsgConnectionOpenTry) -> Result<Self, Self::Error> {
@@ -156,8 +156,8 @@ impl TryFrom<RawMsgConnectionOpenTry> for MsgConnectionOpenTry {
     }
 }
 
-impl From<MsgConnectionOpenTry> for RawMsgConnectionOpenTry {
-    fn from(ics_msg: MsgConnectionOpenTry) -> Self {
+impl<Chain: HostChain> From<MsgConnectionOpenTry<Chain>> for RawMsgConnectionOpenTry {
+    fn from(ics_msg: MsgConnectionOpenTry<Chain>) -> Self {
         RawMsgConnectionOpenTry {
             client_id: ics_msg.client_id.as_str().to_string(),
             previous_connection_id: ics_msg
@@ -201,16 +201,16 @@ pub mod test_util {
     use crate::ics03_connection::msgs::conn_open_try::MsgConnectionOpenTry;
     use crate::ics03_connection::msgs::test_util::get_dummy_raw_counterparty;
     use crate::ics03_connection::version::get_compatible_versions;
-    use crate::ics24_host::identifier::{ClientId, ConnectionId};
+    use crate::ics24_host::identifier::{ClientId, ConnectionId, HostChain};
     use crate::test_utils::{get_dummy_bech32_account, get_dummy_proof};
 
     /// Testing-specific helper methods.
-    impl MsgConnectionOpenTry {
+    impl<Chain: HostChain> MsgConnectionOpenTry<Chain> {
         /// Moves the given message into another one, and updates the `previous_connection_id` field.
         pub fn with_previous_connection_id(
             self,
             previous_connection_id: Option<ConnectionId>,
-        ) -> MsgConnectionOpenTry {
+        ) -> MsgConnectionOpenTry<Chain> {
             MsgConnectionOpenTry {
                 previous_connection_id,
                 ..self
@@ -218,7 +218,7 @@ pub mod test_util {
         }
 
         /// Setter for `client_id`.
-        pub fn with_client_id(self, client_id: ClientId) -> MsgConnectionOpenTry {
+        pub fn with_client_id(self, client_id: ClientId) -> MsgConnectionOpenTry<Chain> {
             MsgConnectionOpenTry { client_id, ..self }
         }
     }

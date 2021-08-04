@@ -9,22 +9,21 @@ use crate::ics03_connection::error::Error;
 use crate::ics03_connection::handler::{ConnectionIdState, ConnectionResult};
 use crate::ics03_connection::version::{get_compatible_versions, pick_version, Version};
 use crate::ics23_commitment::commitment::CommitmentPrefix;
-use crate::ics24_host::identifier::{ClientId, ConnectionId};
-use crate::Height;
+use crate::ics24_host::identifier::{ClientId, ConnectionId, HostChain};
 
 /// A context supplying all the necessary read-only dependencies for processing any `ConnectionMsg`.
-pub trait ConnectionReader {
+pub trait ConnectionReader<Chain: HostChain> {
     /// Returns the ConnectionEnd for the given identifier `conn_id`.
-    fn connection_end(&self, conn_id: &ConnectionId) -> Option<ConnectionEnd>;
+    fn connection_end(&self, conn_id: &Chain::ConnectionId) -> Option<ConnectionEnd<Chain>>;
 
     /// Returns the ClientState for the given identifier `client_id`.
-    fn client_state(&self, client_id: &ClientId) -> Option<AnyClientState>;
+    fn client_state(&self, client_id: &Chain::ClientId) -> Option<AnyClientState>;
 
     /// Returns the current height of the local chain.
-    fn host_current_height(&self) -> Height;
+    fn host_current_height(&self) -> Chain::Height;
 
     /// Returns the oldest height available on the local chain.
-    fn host_oldest_height(&self) -> Height;
+    fn host_oldest_height(&self) -> Chain::Height;
 
     /// Returns the prefix that the local chain uses in the KV store.
     fn commitment_prefix(&self) -> CommitmentPrefix;
@@ -32,12 +31,12 @@ pub trait ConnectionReader {
     /// Returns the ConsensusState that the given client stores at a specific height.
     fn client_consensus_state(
         &self,
-        client_id: &ClientId,
-        height: Height,
+        client_id: &Chain::ClientId,
+        height: Chain::Height,
     ) -> Option<AnyConsensusState>;
 
     /// Returns the ConsensusState of the host (local) chain at a specific height.
-    fn host_consensus_state(&self, height: Height) -> Option<AnyConsensusState>;
+    fn host_consensus_state(&self, height: Chain::Height) -> Option<AnyConsensusState>;
 
     /// Function required by ICS 03. Returns the list of all possible versions that the connection
     /// handshake protocol supports.
@@ -63,8 +62,8 @@ pub trait ConnectionReader {
 
 /// A context supplying all the necessary write-only dependencies (i.e., storage writing facility)
 /// for processing any `ConnectionMsg`.
-pub trait ConnectionKeeper {
-    fn store_connection_result(&mut self, result: ConnectionResult) -> Result<(), Error> {
+pub trait ConnectionKeeper<Chain: HostChain> {
+    fn store_connection_result(&mut self, result: ConnectionResult<Chain>) -> Result<(), Error> {
         self.store_connection(result.connection_id.clone(), &result.connection_end)?;
 
         // If we generated an identifier, increase the counter & associate this new identifier
@@ -85,8 +84,8 @@ pub trait ConnectionKeeper {
     /// Stores the given connection_end at a path associated with the connection_id.
     fn store_connection(
         &mut self,
-        connection_id: ConnectionId,
-        connection_end: &ConnectionEnd,
+        connection_id: Chain::ConnectionId,
+        connection_end: &ConnectionEnd<Chain>,
     ) -> Result<(), Error>;
 
     /// Stores the given connection_id at a path associated with the client_id.

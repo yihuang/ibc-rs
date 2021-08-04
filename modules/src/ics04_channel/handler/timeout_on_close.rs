@@ -12,11 +12,12 @@ use crate::ics04_channel::packet::PacketResult;
 use crate::ics04_channel::{
     context::ChannelReader, error::Error, handler::timeout::TimeoutPacketResult,
 };
+use crate::ics24_host::identifier::HostChain;
 
-pub fn process(
-    ctx: &dyn ChannelReader,
+pub fn process<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     msg: MsgTimeoutOnClose,
-) -> HandlerResult<PacketResult, Error> {
+) -> HandlerResult<PacketResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     let packet = &msg.packet;
@@ -151,7 +152,7 @@ mod tests {
     use crate::ics04_channel::handler::timeout_on_close::process;
     use crate::ics04_channel::msgs::timeout_on_close::test_util::get_dummy_raw_msg_timeout_on_close;
     use crate::ics04_channel::msgs::timeout_on_close::MsgTimeoutOnClose;
-    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, IdentityChain, PortId};
     use crate::timestamp::ZERO_DURATION;
 
     use crate::mock::context::MockContext;
@@ -163,7 +164,7 @@ mod tests {
     fn timeout_on_close_packet_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
+            ctx: MockContext<IdentityChain>,
             msg: MsgTimeoutOnClose,
             want_pass: bool,
         }

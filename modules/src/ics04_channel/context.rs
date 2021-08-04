@@ -9,51 +9,74 @@ use crate::ics04_channel::channel::ChannelEnd;
 use crate::ics04_channel::handler::{ChannelIdState, ChannelResult};
 use crate::ics04_channel::{error::Error, packet::Receipt};
 use crate::ics05_port::capabilities::Capability;
-use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+use crate::ics24_host::identifier::HostChain;
 use crate::timestamp::Timestamp;
-use crate::Height;
 
-use super::packet::{PacketResult, Sequence};
+use super::packet::PacketResult;
 
 /// A context supplying all the necessary read-only dependencies for processing any `ChannelMsg`.
-pub trait ChannelReader {
+pub trait ChannelReader<Chain: HostChain> {
     /// Returns the ChannelEnd for the given `port_id` and `chan_id`.
-    fn channel_end(&self, port_channel_id: &(PortId, ChannelId)) -> Option<ChannelEnd>;
+    fn channel_end(
+        &self,
+        port_channel_id: &(Chain::PortId, Chain::ChannelId),
+    ) -> Option<ChannelEnd<Chain>>;
 
     /// Returns the ConnectionState for the given identifier `connection_id`.
-    fn connection_end(&self, connection_id: &ConnectionId) -> Option<ConnectionEnd>;
+    fn connection_end(&self, connection_id: &Chain::ConnectionId) -> Option<ConnectionEnd<Chain>>;
 
-    fn connection_channels(&self, cid: &ConnectionId) -> Option<Vec<(PortId, ChannelId)>>;
+    fn connection_channels(
+        &self,
+        cid: &Chain::ConnectionId,
+    ) -> Option<Vec<(Chain::PortId, Chain::ChannelId)>>;
 
     /// Returns the ClientState for the given identifier `client_id`. Necessary dependency towards
     /// proof verification.
-    fn client_state(&self, client_id: &ClientId) -> Option<AnyClientState>;
+    fn client_state(&self, client_id: &Chain::ClientId) -> Option<AnyClientState>;
 
     fn client_consensus_state(
         &self,
-        client_id: &ClientId,
-        height: Height,
+        client_id: &Chain::ClientId,
+        height: Chain::Height,
     ) -> Option<AnyConsensusState>;
 
-    fn authenticated_capability(&self, port_id: &PortId) -> Result<Capability, Error>;
+    fn authenticated_capability(&self, port_id: &Chain::PortId) -> Result<Capability, Error>;
 
-    fn get_next_sequence_send(&self, port_channel_id: &(PortId, ChannelId)) -> Option<Sequence>;
+    fn get_next_sequence_send(
+        &self,
+        port_channel_id: &(Chain::PortId, Chain::ChannelId),
+    ) -> Option<Chain::Sequence>;
 
-    fn get_next_sequence_recv(&self, port_channel_id: &(PortId, ChannelId)) -> Option<Sequence>;
+    fn get_next_sequence_recv(
+        &self,
+        port_channel_id: &(Chain::PortId, Chain::ChannelId),
+    ) -> Option<Chain::Sequence>;
 
-    fn get_next_sequence_ack(&self, port_channel_id: &(PortId, ChannelId)) -> Option<Sequence>;
+    fn get_next_sequence_ack(
+        &self,
+        port_channel_id: &(Chain::PortId, Chain::ChannelId),
+    ) -> Option<Chain::Sequence>;
 
-    fn get_packet_commitment(&self, key: &(PortId, ChannelId, Sequence)) -> Option<String>;
+    fn get_packet_commitment(
+        &self,
+        key: &(Chain::PortId, Chain::ChannelId, Chain::Sequence),
+    ) -> Option<String>;
 
-    fn get_packet_receipt(&self, key: &(PortId, ChannelId, Sequence)) -> Option<Receipt>;
+    fn get_packet_receipt(
+        &self,
+        key: &(Chain::PortId, Chain::ChannelId, Chain::Sequence),
+    ) -> Option<Receipt>;
 
-    fn get_packet_acknowledgement(&self, key: &(PortId, ChannelId, Sequence)) -> Option<String>;
+    fn get_packet_acknowledgement(
+        &self,
+        key: &(Chain::PortId, Chain::ChannelId, Chain::Sequence),
+    ) -> Option<String>;
 
     /// A hashing function for packet commitments
     fn hash(&self, value: String) -> String;
 
     /// Returns the current height of the local chain.
-    fn host_height(&self) -> Height;
+    fn host_height(&self) -> Chain::Height;
 
     /// Returns the current timestamp of the local chain.
     fn host_timestamp(&self) -> Timestamp;
@@ -66,8 +89,8 @@ pub trait ChannelReader {
 
 /// A context supplying all the necessary write-only dependencies (i.e., storage writing facility)
 /// for processing any `ChannelMsg`.
-pub trait ChannelKeeper {
-    fn store_channel_result(&mut self, result: ChannelResult) -> Result<(), Error> {
+pub trait ChannelKeeper<Chain: HostChain> {
+    fn store_channel_result(&mut self, result: ChannelResult<Chain>) -> Result<(), Error> {
         // The handler processed this channel & some modifications occurred, store the new end.
         self.store_channel(
             (result.port_id.clone(), result.channel_id.clone()),
@@ -100,7 +123,7 @@ pub trait ChannelKeeper {
         Ok(())
     }
 
-    fn store_packet_result(&mut self, general_result: PacketResult) -> Result<(), Error> {
+    fn store_packet_result(&mut self, general_result: PacketResult<Chain>) -> Result<(), Error> {
         match general_result {
             PacketResult::Send(res) => {
                 self.store_next_sequence_send(
@@ -172,61 +195,63 @@ pub trait ChannelKeeper {
 
     fn store_packet_commitment(
         &mut self,
-        key: (PortId, ChannelId, Sequence),
+        key: (Chain::PortId, Chain::ChannelId, Chain::Sequence),
         timestamp: Timestamp,
-        heigh: Height,
+        heigh: Chain::Height,
         data: Vec<u8>,
     ) -> Result<(), Error>;
 
-    fn delete_packet_commitment(&mut self, key: (PortId, ChannelId, Sequence))
-        -> Result<(), Error>;
+    fn delete_packet_commitment(
+        &mut self,
+        key: (Chain::PortId, Chain::ChannelId, Chain::Sequence),
+    ) -> Result<(), Error>;
 
     fn store_packet_receipt(
         &mut self,
-        key: (PortId, ChannelId, Sequence),
+        key: (Chain::PortId, Chain::ChannelId, Chain::Sequence),
         receipt: Receipt,
     ) -> Result<(), Error>;
 
     fn store_packet_acknowledgement(
         &mut self,
-        key: (PortId, ChannelId, Sequence),
+        key: (Chain::PortId, Chain::ChannelId, Chain::Sequence),
         ack: Vec<u8>,
     ) -> Result<(), Error>;
 
     fn delete_packet_acknowledgement(
         &mut self,
-        key: (PortId, ChannelId, Sequence),
+        key: (Chain::PortId, Chain::ChannelId, Chain::Sequence),
     ) -> Result<(), Error>;
 
     fn store_connection_channels(
         &mut self,
-        conn_id: ConnectionId,
-        port_channel_id: &(PortId, ChannelId),
+        conn_id: Chain::ConnectionId,
+        port_channel_id: &(Chain::PortId, Chain::ChannelId),
     ) -> Result<(), Error>;
 
     /// Stores the given channel_end at a path associated with the port_id and channel_id.
     fn store_channel(
         &mut self,
-        port_channel_id: (PortId, ChannelId),
-        channel_end: &ChannelEnd,
+        port_channel_id: (Chain::PortId, Chain::ChannelId),
+        channel_end: &ChannelEnd<Chain>,
     ) -> Result<(), Error>;
 
     fn store_next_sequence_send(
         &mut self,
-        port_channel_id: (PortId, ChannelId),
-        seq: Sequence,
+        port_channel_id: (Chain::PortId, Chain::ChannelId),
+        seq: Chain::Sequence,
     ) -> Result<(), Error>;
 
     fn store_next_sequence_recv(
         &mut self,
-        port_channel_id: (PortId, ChannelId),
-        seq: Sequence,
+        port_channel_id: (Chain::PortId, Chain::ChannelId),
+        seq: Chain::Sequence,
     ) -> Result<(), Error>;
 
     fn store_next_sequence_ack(
         &mut self,
-        port_channel_id: (PortId, ChannelId),
-        seq: Sequence,
+        port_channel_id: (Chain::PortId, Chain::ChannelId),
+        seq: Chain::Sequence,
     ) -> Result<(), Error>;
 
     /// Called upon channel identifier creation (Init or Try message processing).

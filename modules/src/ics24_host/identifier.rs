@@ -1,12 +1,61 @@
-use std::convert::TryFrom;
-use std::str::FromStr;
+use core::convert::{From, Into, TryFrom};
+use core::fmt::Display;
+use core::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
 use crate::ics02_client::client_type::ClientType;
+use crate::ics04_channel::packet::Sequence;
 use crate::ics24_host::error::ValidationError;
+use crate::Height;
 
 use super::validate::*;
+
+/**
+  A host chain with parameter types encapsulated as existential associated types.
+  This helps prevent accidental mix up of parameters from different chains.
+
+  To keep existing code work, we make the associated types isomorphic to the
+  raw types using the `From` and `Into` traits. This also gives backdoor
+  access around the type system where we can shoot ourselve in
+  the foot by converting the parameters from the wrong chain.
+  But hopefully we can still prevent most of the _accidental_ mix ups.
+
+  In practice, the associated types are simply defined to be the same
+  as the raw types. So this should not introduce overhead at runtime.
+**/
+pub trait HostChain: Clone {
+    type Height: Clone + Display + From<Height> + Into<Height>;
+
+    type ClientId: Clone + Display + From<ClientId> + Into<ClientId>;
+
+    type ConnectionId: Clone + Display + From<ConnectionId> + Into<ConnectionId>;
+
+    type ChannelId: Clone + Display + From<ChannelId> + Into<ChannelId>;
+
+    type PortId: Clone + Display + From<PortId> + Into<PortId>;
+
+    type Sequence: Clone + Display + From<Sequence> + Into<Sequence>;
+}
+
+// An identity host chain with raw identifiers.
+// Useful for testing.
+#[derive(Debug, Clone)]
+pub struct IdentityChain;
+
+impl HostChain for IdentityChain {
+    type Height = Height;
+
+    type ClientId = ClientId;
+
+    type ConnectionId = ConnectionId;
+
+    type ChannelId = ChannelId;
+
+    type PortId = PortId;
+
+    type Sequence = Sequence;
+}
 
 /// This type is subject to future changes.
 ///
@@ -104,7 +153,7 @@ impl FromStr for ChainId {
     }
 }
 
-impl std::fmt::Display for ChainId {
+impl Display for ChainId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.id)
     }
@@ -181,7 +230,7 @@ impl ClientId {
 }
 
 /// This implementation provides a `to_string` method.
-impl std::fmt::Display for ClientId {
+impl Display for ClientId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.0)
     }
@@ -251,7 +300,7 @@ impl ConnectionId {
 }
 
 /// This implementation provides a `to_string` method.
-impl std::fmt::Display for ConnectionId {
+impl Display for ConnectionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.0)
     }
@@ -301,7 +350,7 @@ impl PortId {
 }
 
 /// This implementation provides a `to_string` method.
-impl std::fmt::Display for PortId {
+impl Display for PortId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.0)
     }
@@ -357,7 +406,7 @@ impl ChannelId {
 }
 
 /// This implementation provides a `to_string` method.
-impl std::fmt::Display for ChannelId {
+impl Display for ChannelId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.0)
     }
@@ -391,7 +440,7 @@ pub struct PortChannelId {
     pub port_id: PortId,
 }
 
-impl std::fmt::Display for PortChannelId {
+impl Display for PortChannelId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}/{}", self.port_id, self.channel_id)
     }

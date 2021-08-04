@@ -5,14 +5,12 @@ use crate::handler::HandlerOutput;
 use crate::ics04_channel::handler::send_packet::send_packet;
 use crate::ics04_channel::packet::Packet;
 use crate::ics04_channel::packet::PacketResult;
+use crate::ics24_host::identifier::HostChain;
 
-pub(crate) fn send_transfer<Ctx>(
+pub(crate) fn send_transfer<Chain: HostChain, Ctx: Ics20Context<Chain>>(
     ctx: &Ctx,
     msg: MsgTransfer,
-) -> Result<HandlerOutput<PacketResult>, Error>
-where
-    Ctx: Ics20Context,
-{
+) -> Result<HandlerOutput<PacketResult<Chain>>, Error> {
     let source_channel_end = ctx
         .channel_end(&(msg.source_port.clone(), msg.source_channel.clone()))
         .ok_or_else(|| {

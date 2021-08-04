@@ -16,6 +16,7 @@ use crate::ics03_connection::msgs::conn_open_ack::MsgConnectionOpenAck;
 use crate::ics03_connection::msgs::conn_open_confirm::MsgConnectionOpenConfirm;
 use crate::ics03_connection::msgs::conn_open_init::MsgConnectionOpenInit;
 use crate::ics03_connection::msgs::conn_open_try::MsgConnectionOpenTry;
+use crate::ics24_host::identifier::HostChain;
 
 pub mod conn_open_ack;
 pub mod conn_open_confirm;
@@ -24,9 +25,9 @@ pub mod conn_open_try;
 
 /// Enumeration of all possible messages that the ICS3 protocol processes.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ConnectionMsg {
-    ConnectionOpenInit(MsgConnectionOpenInit),
-    ConnectionOpenTry(Box<MsgConnectionOpenTry>),
+pub enum ConnectionMsg<Chain: HostChain> {
+    ConnectionOpenInit(MsgConnectionOpenInit<Chain>),
+    ConnectionOpenTry(Box<MsgConnectionOpenTry<Chain>>),
     ConnectionOpenAck(Box<MsgConnectionOpenAck>),
     ConnectionOpenConfirm(MsgConnectionOpenConfirm),
 }

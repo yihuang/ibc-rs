@@ -2,25 +2,25 @@ use crate::ics04_channel::channel::State;
 use crate::ics04_channel::events::WriteAcknowledgement;
 use crate::ics04_channel::packet::{Packet, PacketResult, Sequence};
 use crate::ics04_channel::{context::ChannelReader, error::Error};
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::HostChain;
 use crate::{
     events::IbcEvent,
     handler::{HandlerOutput, HandlerResult},
 };
 
 #[derive(Clone, Debug)]
-pub struct WriteAckPacketResult {
-    pub port_id: PortId,
-    pub channel_id: ChannelId,
+pub struct WriteAckPacketResult<Chain: HostChain> {
+    pub port_id: Chain::PortId,
+    pub channel_id: Chain::ChannelId,
     pub seq: Sequence,
     pub ack: Vec<u8>,
 }
 
-pub fn process(
-    ctx: &dyn ChannelReader,
+pub fn process<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     packet: Packet,
     ack: Vec<u8>,
-) -> HandlerResult<PacketResult, Error> {
+) -> HandlerResult<PacketResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     let dest_channel_end = ctx
@@ -93,7 +93,7 @@ mod tests {
     use crate::ics04_channel::channel::{ChannelEnd, Counterparty, Order, State};
     use crate::ics04_channel::handler::write_acknowledgement::process;
     use crate::ics04_channel::packet::test_utils::get_dummy_raw_packet;
-    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+    use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, IdentityChain, PortId};
     use crate::mock::context::MockContext;
     use crate::timestamp::ZERO_DURATION;
     use crate::{events::IbcEvent, ics04_channel::packet::Packet};
@@ -102,7 +102,7 @@ mod tests {
     fn write_ack_packet_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
+            ctx: MockContext<IdentityChain>,
             packet: Packet,
             ack: Vec<u8>,
             want_pass: bool,

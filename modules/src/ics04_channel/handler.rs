@@ -7,7 +7,7 @@ use crate::ics04_channel::error::Error;
 use crate::ics04_channel::msgs::ChannelMsg;
 use crate::ics04_channel::{msgs::PacketMsg, packet::PacketResult};
 use crate::ics05_port::capabilities::Capability;
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::HostChain;
 
 pub mod acknowledgement;
 pub mod chan_close_confirm;
@@ -35,22 +35,22 @@ pub enum ChannelIdState {
 }
 
 #[derive(Clone, Debug)]
-pub struct ChannelResult {
-    pub port_id: PortId,
-    pub channel_id: ChannelId,
+pub struct ChannelResult<Chain: HostChain> {
+    pub port_id: Chain::PortId,
+    pub channel_id: Chain::ChannelId,
     pub channel_id_state: ChannelIdState,
     pub channel_cap: Capability,
-    pub channel_end: ChannelEnd,
+    pub channel_end: ChannelEnd<Chain>,
 }
 
 /// General entry point for processing any type of message related to the ICS4 channel open and
 /// channel close handshake protocols.
-pub fn channel_dispatch<Ctx>(
+pub fn channel_dispatch<Ctx, Chain: HostChain>(
     ctx: &Ctx,
-    msg: ChannelMsg,
-) -> Result<HandlerOutput<ChannelResult>, Error>
+    msg: ChannelMsg<Chain>,
+) -> Result<HandlerOutput<ChannelResult<Chain>>, Error>
 where
-    Ctx: ChannelReader,
+    Ctx: ChannelReader<Chain>,
 {
     match msg {
         ChannelMsg::ChannelOpenInit(msg) => chan_open_init::process(ctx, msg),
@@ -63,9 +63,12 @@ where
 }
 
 /// Dispatcher for processing any type of message related to the ICS4 packet protocols.
-pub fn packet_dispatch<Ctx>(ctx: &Ctx, msg: PacketMsg) -> Result<HandlerOutput<PacketResult>, Error>
+pub fn packet_dispatch<Ctx, Chain: HostChain>(
+    ctx: &Ctx,
+    msg: PacketMsg,
+) -> Result<HandlerOutput<PacketResult<Chain>>, Error>
 where
-    Ctx: ChannelReader,
+    Ctx: ChannelReader<Chain>,
 {
     match msg {
         PacketMsg::RecvPacket(msg) => recv_packet::process(ctx, msg),

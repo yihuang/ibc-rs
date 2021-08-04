@@ -73,7 +73,7 @@ mod tests {
     use crate::ics02_client::msgs::ClientMsg;
     use crate::ics07_tendermint::client_state::{AllowUpdate, ClientState};
     use crate::ics07_tendermint::header::test_util::get_dummy_tendermint_header;
-    use crate::ics24_host::identifier::ClientId;
+    use crate::ics24_host::identifier::{ClientId, IdentityChain};
     use crate::mock::client_state::{MockClientState, MockConsensusState};
     use crate::mock::context::MockContext;
     use crate::mock::header::MockHeader;
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn test_create_client_ok() {
-        let ctx = MockContext::default();
+        let ctx = <MockContext<IdentityChain>>::default();
         let signer = get_dummy_account_id();
         let height = Height::new(0, 42);
 

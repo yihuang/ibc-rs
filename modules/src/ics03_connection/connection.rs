@@ -15,35 +15,35 @@ use crate::ics03_connection::error::Error;
 use crate::ics03_connection::version::Version;
 use crate::ics23_commitment::commitment::CommitmentPrefix;
 use crate::ics24_host::error::ValidationError;
-use crate::ics24_host::identifier::{ClientId, ConnectionId};
+use crate::ics24_host::identifier::{ClientId, HostChain};
 use crate::timestamp::ZERO_DURATION;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct IdentifiedConnectionEnd {
-    pub connection_id: ConnectionId,
-    pub connection_end: ConnectionEnd,
+pub struct IdentifiedConnectionEnd<Chain: HostChain> {
+    pub connection_id: Chain::ConnectionId,
+    pub connection_end: ConnectionEnd<Chain>,
 }
 
-impl IdentifiedConnectionEnd {
-    pub fn new(connection_id: ConnectionId, connection_end: ConnectionEnd) -> Self {
+impl<Chain: HostChain> IdentifiedConnectionEnd<Chain> {
+    pub fn new(connection_id: Chain::ConnectionId, connection_end: ConnectionEnd<Chain>) -> Self {
         IdentifiedConnectionEnd {
             connection_id,
             connection_end,
         }
     }
 
-    pub fn id(&self) -> &ConnectionId {
+    pub fn id(&self) -> &Chain::ConnectionId {
         &self.connection_id
     }
 
-    pub fn end(&self) -> &ConnectionEnd {
+    pub fn end(&self) -> &ConnectionEnd<Chain> {
         &self.connection_end
     }
 }
 
-impl Protobuf<RawIdentifiedConnection> for IdentifiedConnectionEnd {}
+impl<Chain: HostChain> Protobuf<RawIdentifiedConnection> for IdentifiedConnectionEnd<Chain> {}
 
-impl TryFrom<RawIdentifiedConnection> for IdentifiedConnectionEnd {
+impl<Chain: HostChain> TryFrom<RawIdentifiedConnection> for IdentifiedConnectionEnd<Chain> {
     type Error = Error;
 
     fn try_from(value: RawIdentifiedConnection) -> Result<Self, Self::Error> {
@@ -62,8 +62,8 @@ impl TryFrom<RawIdentifiedConnection> for IdentifiedConnectionEnd {
     }
 }
 
-impl From<IdentifiedConnectionEnd> for RawIdentifiedConnection {
-    fn from(value: IdentifiedConnectionEnd) -> Self {
+impl<Chain: HostChain> From<IdentifiedConnectionEnd<Chain>> for RawIdentifiedConnection {
+    fn from(value: IdentifiedConnectionEnd<Chain>) -> Self {
         RawIdentifiedConnection {
             id: value.connection_id.to_string(),
             client_id: value.connection_end.client_id.to_string(),
@@ -81,15 +81,15 @@ impl From<IdentifiedConnectionEnd> for RawIdentifiedConnection {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ConnectionEnd {
+pub struct ConnectionEnd<Chain: HostChain> {
     pub state: State,
-    client_id: ClientId,
-    counterparty: Counterparty,
+    client_id: Chain::ClientId,
+    counterparty: Counterparty<Chain>,
     versions: Vec<Version>,
     delay_period: Duration,
 }
 
-impl Default for ConnectionEnd {
+impl<Chain: HostChain> Default for ConnectionEnd<Chain> {
     fn default() -> Self {
         Self {
             state: State::Uninitialized,
@@ -101,9 +101,9 @@ impl Default for ConnectionEnd {
     }
 }
 
-impl Protobuf<RawConnectionEnd> for ConnectionEnd {}
+impl<Chain: HostChain> Protobuf<RawConnectionEnd> for ConnectionEnd<Chain> {}
 
-impl TryFrom<RawConnectionEnd> for ConnectionEnd {
+impl<Chain: HostChain> TryFrom<RawConnectionEnd> for ConnectionEnd<Chain> {
     type Error = Error;
     fn try_from(value: RawConnectionEnd) -> Result<Self, Self::Error> {
         let state = value.state.try_into()?;
@@ -131,8 +131,8 @@ impl TryFrom<RawConnectionEnd> for ConnectionEnd {
     }
 }
 
-impl From<ConnectionEnd> for RawConnectionEnd {
-    fn from(value: ConnectionEnd) -> Self {
+impl<Chain: HostChain> From<ConnectionEnd<Chain>> for RawConnectionEnd {
+    fn from(value: ConnectionEnd<Chain>) -> Self {
         RawConnectionEnd {
             client_id: value.client_id.to_string(),
             versions: value
@@ -147,11 +147,11 @@ impl From<ConnectionEnd> for RawConnectionEnd {
     }
 }
 
-impl ConnectionEnd {
+impl<Chain: HostChain> ConnectionEnd<Chain> {
     pub fn new(
         state: State,
         client_id: ClientId,
-        counterparty: Counterparty,
+        counterparty: Counterparty<Chain>,
         versions: Vec<Version>,
         delay_period: Duration,
     ) -> Self {
@@ -175,7 +175,7 @@ impl ConnectionEnd {
     }
 
     /// Setter for the `counterparty` field.
-    pub fn set_counterparty(&mut self, new_cparty: Counterparty) {
+    pub fn set_counterparty(&mut self, new_cparty: Counterparty<Chain>) {
         self.counterparty = new_cparty;
     }
 
@@ -185,12 +185,12 @@ impl ConnectionEnd {
     }
 
     /// Helper function to compare the counterparty of this end with another counterparty.
-    pub fn counterparty_matches(&self, other: &Counterparty) -> bool {
+    pub fn counterparty_matches(&self, other: &Counterparty<Chain>) -> bool {
         self.counterparty.eq(other)
     }
 
     /// Helper function to compare the client id of this end with another client identifier.
-    pub fn client_id_matches(&self, other: &ClientId) -> bool {
+    pub fn client_id_matches(&self, other: &Chain::ClientId) -> bool {
         self.client_id.eq(other)
     }
 
@@ -218,7 +218,7 @@ impl ConnectionEnd {
     }
 
     /// Getter for the counterparty.
-    pub fn counterparty(&self) -> &Counterparty {
+    pub fn counterparty(&self) -> &Counterparty<Chain> {
         &self.counterparty
     }
 
@@ -235,13 +235,13 @@ impl ConnectionEnd {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Counterparty {
-    client_id: ClientId,
-    pub connection_id: Option<ConnectionId>,
+pub struct Counterparty<Chain: HostChain> {
+    client_id: Chain::ClientId,
+    pub connection_id: Option<Chain::ConnectionId>,
     prefix: CommitmentPrefix,
 }
 
-impl Default for Counterparty {
+impl<Chain: HostChain> Default for Counterparty<Chain> {
     fn default() -> Self {
         Counterparty {
             client_id: Default::default(),
@@ -251,11 +251,11 @@ impl Default for Counterparty {
     }
 }
 
-impl Protobuf<RawCounterparty> for Counterparty {}
+impl<Chain: HostChain> Protobuf<RawCounterparty> for Counterparty<Chain> {}
 
 // Converts from the wire format RawCounterparty. Typically used from the relayer side
 // during queries for response validation and to extract the Counterparty structure.
-impl TryFrom<RawCounterparty> for Counterparty {
+impl<Chain: HostChain> TryFrom<RawCounterparty> for Counterparty<Chain> {
     type Error = Error;
 
     fn try_from(value: RawCounterparty) -> Result<Self, Self::Error> {
@@ -276,8 +276,8 @@ impl TryFrom<RawCounterparty> for Counterparty {
     }
 }
 
-impl From<Counterparty> for RawCounterparty {
-    fn from(value: Counterparty) -> Self {
+impl<Chain: HostChain> From<Counterparty<Chain>> for RawCounterparty {
+    fn from(value: Counterparty<Chain>) -> Self {
         RawCounterparty {
             client_id: value.client_id.as_str().to_string(),
             connection_id: value
@@ -290,10 +290,10 @@ impl From<Counterparty> for RawCounterparty {
     }
 }
 
-impl Counterparty {
+impl<Chain: HostChain> Counterparty<Chain> {
     pub fn new(
-        client_id: ClientId,
-        connection_id: Option<ConnectionId>,
+        client_id: Chain::ClientId,
+        connection_id: Option<Chain::ConnectionId>,
         prefix: CommitmentPrefix,
     ) -> Self {
         Self {
@@ -304,12 +304,12 @@ impl Counterparty {
     }
 
     /// Getter for the client id.
-    pub fn client_id(&self) -> &ClientId {
+    pub fn client_id(&self) -> &Chain::ClientId {
         &self.client_id
     }
 
     /// Getter for connection id.
-    pub fn connection_id(&self) -> Option<&ConnectionId> {
+    pub fn connection_id(&self) -> Option<&Chain::ConnectionId> {
         self.connection_id.as_ref()
     }
 

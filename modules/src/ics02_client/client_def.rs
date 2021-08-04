@@ -11,13 +11,13 @@ use crate::ics04_channel::channel::ChannelEnd;
 use crate::ics04_channel::packet::Sequence;
 use crate::ics07_tendermint::client_def::TendermintClient;
 use crate::ics23_commitment::commitment::{CommitmentPrefix, CommitmentProofBytes, CommitmentRoot};
-use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, HostChain, PortId};
 use crate::Height;
 
 #[cfg(any(test, feature = "mocks"))]
 use crate::mock::client_def::MockClient;
 
-pub trait ClientDef: Clone {
+pub trait ClientDef<Chain: HostChain>: Clone {
     type Header: Header;
     type ClientState: ClientState;
     type ConsensusState: ConsensusState;
@@ -64,7 +64,7 @@ pub trait ClientDef: Clone {
         prefix: &CommitmentPrefix,
         proof: &CommitmentProofBytes,
         connection_id: Option<&ConnectionId>,
-        expected_connection_end: &ConnectionEnd,
+        expected_connection_end: &ConnectionEnd<Chain>,
     ) -> Result<(), Error>;
 
     /// Verify a `proof` that a channel state matches that of the input `channel_end`.
@@ -72,12 +72,12 @@ pub trait ClientDef: Clone {
     fn verify_channel_state(
         &self,
         client_state: &Self::ClientState,
-        height: Height,
+        height: Chain::Height,
         prefix: &CommitmentPrefix,
         proof: &CommitmentProofBytes,
-        port_id: &PortId,
-        channel_id: &ChannelId,
-        expected_channel_end: &ChannelEnd,
+        port_id: &Chain::PortId,
+        channel_id: &Chain::ChannelId,
+        expected_channel_end: &ChannelEnd<Chain>,
     ) -> Result<(), Error>;
 
     /// Verify the client state for this chain that it is stored on the counterparty chain.
@@ -164,7 +164,7 @@ impl AnyClient {
 }
 
 // ⚠️  Beware of the awful boilerplate below ⚠️
-impl ClientDef for AnyClient {
+impl<Chain: HostChain> ClientDef<Chain> for AnyClient {
     type Header = AnyHeader;
     type ClientState = AnyClientState;
     type ConsensusState = AnyConsensusState;
@@ -266,7 +266,7 @@ impl ClientDef for AnyClient {
         prefix: &CommitmentPrefix,
         proof: &CommitmentProofBytes,
         connection_id: Option<&ConnectionId>,
-        expected_connection_end: &ConnectionEnd,
+        expected_connection_end: &ConnectionEnd<Chain>,
     ) -> Result<(), Error> {
         match self {
             Self::Tendermint(client) => {
@@ -303,12 +303,12 @@ impl ClientDef for AnyClient {
     fn verify_channel_state(
         &self,
         client_state: &AnyClientState,
-        height: Height,
+        height: Chain::Height,
         prefix: &CommitmentPrefix,
         proof: &CommitmentProofBytes,
-        port_id: &PortId,
-        channel_id: &ChannelId,
-        expected_channel_end: &ChannelEnd,
+        port_id: &Chain::PortId,
+        channel_id: &Chain::ChannelId,
+        expected_channel_end: &ChannelEnd<Chain>,
     ) -> Result<(), Error> {
         match self {
             Self::Tendermint(client) => {

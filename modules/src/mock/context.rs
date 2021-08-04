@@ -27,7 +27,9 @@ use crate::ics07_tendermint::client_state::test_util::get_dummy_tendermint_clien
 use crate::ics18_relayer::context::Ics18Context;
 use crate::ics18_relayer::error::Error as Ics18Error;
 use crate::ics23_commitment::commitment::CommitmentPrefix;
-use crate::ics24_host::identifier::{ChainId, ChannelId, ClientId, ConnectionId, PortId};
+use crate::ics24_host::identifier::{
+    ChainId, ChannelId, ClientId, ConnectionId, HostChain, PortId,
+};
 use crate::ics26_routing::context::Ics26Context;
 use crate::ics26_routing::handler::{deliver, dispatch};
 use crate::ics26_routing::msgs::Ics26Envelope;
@@ -40,7 +42,7 @@ use crate::Height;
 
 /// A context implementing the dependencies necessary for testing any IBC module.
 #[derive(Clone, Debug)]
-pub struct MockContext {
+pub struct MockContext<Chain: HostChain> {
     /// The type of host chain underlying this mock context.
     host_chain_type: HostType,
 
@@ -71,7 +73,7 @@ pub struct MockContext {
     client_connections: HashMap<ClientId, ConnectionId>,
 
     /// All the connections in the store.
-    connections: HashMap<ConnectionId, ConnectionEnd>,
+    connections: HashMap<ConnectionId, ConnectionEnd<Chain>>,
 
     /// Counter for connection identifiers (see `increase_connection_counter`).
     connection_ids_counter: u64,
@@ -83,7 +85,7 @@ pub struct MockContext {
     channel_ids_counter: u64,
 
     /// All the channels in the store. TODO Make new key PortId X ChanneId
-    channels: HashMap<(PortId, ChannelId), ChannelEnd>,
+    channels: HashMap<(PortId, ChannelId), ChannelEnd<Chain>>,
 
     /// Tracks the sequence number for the next packet to be sent.
     next_sequence_send: HashMap<(PortId, ChannelId), Sequence>,
@@ -109,7 +111,7 @@ pub struct MockContext {
 /// Returns a MockContext with bare minimum initialization: no clients, no connections and no channels are
 /// present, and the chain has Height(5). This should be used sparingly, mostly for testing the
 /// creation of new domain objects.
-impl Default for MockContext {
+impl<Chain: HostChain> Default for MockContext<Chain> {
     fn default() -> Self {
         Self::new(
             ChainId::new("mockgaia".to_string(), 0),
@@ -122,7 +124,7 @@ impl Default for MockContext {
 
 /// Implementation of internal interface for use in testing. The methods in this interface should
 /// _not_ be accessible to any Ics handler.
-impl MockContext {
+impl<Chain: HostChain> MockContext<Chain> {
     /// Creates a mock context. Parameter `max_history_size` determines how many blocks will
     /// the chain maintain in its history, which also determines the pruning window. Parameter
     /// `latest_height` determines the current height of the chain. This context
@@ -238,14 +240,14 @@ impl MockContext {
     /// Associates a connection to this context.
     pub fn with_connection(
         mut self,
-        connection_id: ConnectionId,
-        connection_end: ConnectionEnd,
+        connection_id: Chain::ConnectionId,
+        connection_end: ConnectionEnd<Chain>,
     ) -> Self {
         self.connections.insert(connection_id, connection_end);
         self
     }
 
-    pub fn with_port_capability(mut self, port_id: PortId) -> Self {
+    pub fn with_port_capability(mut self, port_id: Chain::PortId) -> Self {
         self.port_capabilities.insert(port_id, Capability::new());
         self
     }
@@ -253,9 +255,9 @@ impl MockContext {
     /// Associates a channel (in an arbitrary state) to this context.
     pub fn with_channel(
         self,
-        port_id: PortId,
-        chan_id: ChannelId,
-        channel_end: ChannelEnd,
+        port_id: Chain::PortId,
+        chan_id: Chain::ChannelId,
+        channel_end: ChannelEnd<Chain>,
     ) -> Self {
         let mut channels = self.channels.clone();
         channels.insert((port_id, chan_id), channel_end);
@@ -380,7 +382,7 @@ impl MockContext {
     /// A datagram passes from the relayer to the IBC module (on host chain).
     /// Alternative method to `Ics18Context::send` that does not exercise any serialization.
     /// Used in testing the Ics18 algorithms, hence this may return a Ics18Error.
-    pub fn deliver(&mut self, msg: Ics26Envelope) -> Result<(), Ics18Error> {
+    pub fn deliver(&mut self, msg: Ics26Envelope<Chain>) -> Result<(), Ics18Error> {
         dispatch(self, msg).map_err(Ics18Error::transaction_failed)?;
         // Create a new block.
         self.advance_host_chain_height();
@@ -431,11 +433,11 @@ impl MockContext {
     }
 }
 
-impl Ics26Context for MockContext {}
+impl<Chain: HostChain> Ics26Context<Chain> for MockContext<Chain> {}
 
-impl Ics20Context for MockContext {}
+impl<Chain: HostChain> Ics20Context<Chain> for MockContext<Chain> {}
 
-impl PortReader for MockContext {
+impl<Chain: HostChain> PortReader for MockContext<Chain> {
     fn lookup_module_by_port(&self, port_id: &PortId) -> Option<Capability> {
         self.port_capabilities.get(port_id).cloned()
     }
@@ -445,32 +447,38 @@ impl PortReader for MockContext {
     }
 }
 
-impl ChannelReader for MockContext {
-    fn channel_end(&self, pcid: &(PortId, ChannelId)) -> Option<ChannelEnd> {
+impl<Chain: HostChain> ChannelReader<Chain> for MockContext<Chain> {
+    fn channel_end(&self, pcid: &(Chain::PortId, Chain::ChannelId)) -> Option<ChannelEnd<Chain>> {
         self.channels.get(pcid).cloned()
     }
 
-    fn connection_end(&self, cid: &ConnectionId) -> Option<ConnectionEnd> {
+    fn connection_end(&self, cid: &Chain::ConnectionId) -> Option<ConnectionEnd<Chain>> {
         self.connections.get(cid).cloned()
     }
 
-    fn connection_channels(&self, cid: &ConnectionId) -> Option<Vec<(PortId, ChannelId)>> {
+    fn connection_channels(
+        &self,
+        cid: &Chain::ConnectionId,
+    ) -> Option<Vec<(Chain::PortId, Chain::ChannelId)>> {
         self.connection_channels.get(cid).cloned()
     }
 
-    fn client_state(&self, client_id: &ClientId) -> Option<AnyClientState> {
+    fn client_state(&self, client_id: &Chain::ClientId) -> Option<AnyClientState> {
         ClientReader::client_state(self, client_id)
     }
 
     fn client_consensus_state(
         &self,
-        client_id: &ClientId,
-        height: Height,
+        client_id: &Chain::ClientId,
+        height: Chain::Height,
     ) -> Option<AnyConsensusState> {
         ClientReader::consensus_state(self, client_id, height)
     }
 
-    fn authenticated_capability(&self, port_id: &PortId) -> Result<Capability, ChannelError> {
+    fn authenticated_capability(
+        &self,
+        port_id: &Chain::PortId,
+    ) -> Result<Capability, ChannelError> {
         let cap = PortReader::lookup_module_by_port(self, port_id);
         match cap {
             Some(key) => {
@@ -484,27 +492,45 @@ impl ChannelReader for MockContext {
         }
     }
 
-    fn get_next_sequence_send(&self, port_channel_id: &(PortId, ChannelId)) -> Option<Sequence> {
+    fn get_next_sequence_send(
+        &self,
+        port_channel_id: &(Chain::PortId, Chain::ChannelId),
+    ) -> Option<Chain::Sequence> {
         self.next_sequence_send.get(port_channel_id).cloned()
     }
 
-    fn get_next_sequence_recv(&self, port_channel_id: &(PortId, ChannelId)) -> Option<Sequence> {
+    fn get_next_sequence_recv(
+        &self,
+        port_channel_id: &(Chain::PortId, Chain::ChannelId),
+    ) -> Option<Chain::Sequence> {
         self.next_sequence_recv.get(port_channel_id).cloned()
     }
 
-    fn get_next_sequence_ack(&self, port_channel_id: &(PortId, ChannelId)) -> Option<Sequence> {
+    fn get_next_sequence_ack(
+        &self,
+        port_channel_id: &(Chain::PortId, Chain::ChannelId),
+    ) -> Option<Chain::Sequence> {
         self.next_sequence_ack.get(port_channel_id).cloned()
     }
 
-    fn get_packet_commitment(&self, key: &(PortId, ChannelId, Sequence)) -> Option<String> {
+    fn get_packet_commitment(
+        &self,
+        key: &(Chain::PortId, Chain::ChannelId, Chain::Sequence),
+    ) -> Option<String> {
         self.packet_commitment.get(key).cloned()
     }
 
-    fn get_packet_receipt(&self, key: &(PortId, ChannelId, Sequence)) -> Option<Receipt> {
+    fn get_packet_receipt(
+        &self,
+        key: &(Chain::PortId, Chain::ChannelId, Chain::Sequence),
+    ) -> Option<Receipt> {
         self.packet_receipt.get(key).cloned()
     }
 
-    fn get_packet_acknowledgement(&self, key: &(PortId, ChannelId, Sequence)) -> Option<String> {
+    fn get_packet_acknowledgement(
+        &self,
+        key: &(Chain::PortId, Chain::ChannelId, Chain::Sequence),
+    ) -> Option<String> {
         self.packet_acknowledgement.get(key).cloned()
     }
 
@@ -513,7 +539,7 @@ impl ChannelReader for MockContext {
         format!("{:x}", r)
     }
 
-    fn host_height(&self) -> Height {
+    fn host_height(&self) -> Chain::Height {
         self.latest_height
     }
 
@@ -526,7 +552,7 @@ impl ChannelReader for MockContext {
     }
 }
 
-impl ChannelKeeper for MockContext {
+impl<Chain: HostChain> ChannelKeeper<Chain> for MockContext<Chain> {
     fn store_packet_commitment(
         &mut self,
         key: (PortId, ChannelId, Sequence),
@@ -574,7 +600,7 @@ impl ChannelKeeper for MockContext {
     fn store_channel(
         &mut self,
         port_channel_id: (PortId, ChannelId),
-        channel_end: &ChannelEnd,
+        channel_end: &ChannelEnd<Chain>,
     ) -> Result<(), ChannelError> {
         self.channels.insert(port_channel_id, channel_end.clone());
         Ok(())
@@ -629,21 +655,21 @@ impl ChannelKeeper for MockContext {
     }
 }
 
-impl ConnectionReader for MockContext {
-    fn connection_end(&self, cid: &ConnectionId) -> Option<ConnectionEnd> {
+impl<Chain: HostChain> ConnectionReader<Chain> for MockContext<Chain> {
+    fn connection_end(&self, cid: &Chain::ConnectionId) -> Option<ConnectionEnd<Chain>> {
         self.connections.get(cid).cloned()
     }
 
-    fn client_state(&self, client_id: &ClientId) -> Option<AnyClientState> {
+    fn client_state(&self, client_id: &Chain::ClientId) -> Option<AnyClientState> {
         // Forward method call to the Ics2 Client-specific method.
         ClientReader::client_state(self, client_id)
     }
 
-    fn host_current_height(&self) -> Height {
+    fn host_current_height(&self) -> Chain::Height {
         self.latest_height
     }
 
-    fn host_oldest_height(&self) -> Height {
+    fn host_oldest_height(&self) -> Chain::Height {
         // history must be non-empty, so `self.history[0]` is valid
         self.history[0].height()
     }
@@ -654,14 +680,14 @@ impl ConnectionReader for MockContext {
 
     fn client_consensus_state(
         &self,
-        client_id: &ClientId,
-        height: Height,
+        client_id: &Chain::ClientId,
+        height: Chain::Height,
     ) -> Option<AnyConsensusState> {
         // Forward method call to the Ics2Client-specific method.
         self.consensus_state(client_id, height)
     }
 
-    fn host_consensus_state(&self, height: Height) -> Option<AnyConsensusState> {
+    fn host_consensus_state(&self, height: Chain::Height) -> Option<AnyConsensusState> {
         let block_ref = self.host_block(height);
         block_ref.cloned().map(Into::into)
     }
@@ -671,11 +697,11 @@ impl ConnectionReader for MockContext {
     }
 }
 
-impl ConnectionKeeper for MockContext {
+impl<Chain: HostChain> ConnectionKeeper for MockContext<Chain> {
     fn store_connection(
         &mut self,
         connection_id: ConnectionId,
-        connection_end: &ConnectionEnd,
+        connection_end: &ConnectionEnd<Chain>,
     ) -> Result<(), Ics3Error> {
         self.connections
             .insert(connection_id, connection_end.clone());
@@ -697,7 +723,7 @@ impl ConnectionKeeper for MockContext {
     }
 }
 
-impl ClientReader for MockContext {
+impl<Chain: HostChain> ClientReader for MockContext<Chain> {
     fn client_type(&self, client_id: &ClientId) -> Option<ClientType> {
         match self.clients.get(client_id) {
             Some(client_record) => client_record.client_type.into(),
@@ -727,7 +753,7 @@ impl ClientReader for MockContext {
     }
 }
 
-impl ClientKeeper for MockContext {
+impl<Chain: HostChain> ClientKeeper for MockContext<Chain> {
     fn store_client_type(
         &mut self,
         client_id: ClientId,
@@ -781,7 +807,7 @@ impl ClientKeeper for MockContext {
     }
 }
 
-impl Ics18Context for MockContext {
+impl<Chain: HostChain> Ics18Context for MockContext<Chain> {
     fn query_latest_height(&self) -> Height {
         self.host_current_height()
     }
@@ -811,7 +837,7 @@ impl Ics18Context for MockContext {
 
 #[cfg(test)]
 mod tests {
-    use crate::ics24_host::identifier::ChainId;
+    use crate::ics24_host::identifier::{ChainId, IdentityChain};
     use crate::mock::context::MockContext;
     use crate::mock::host::HostType;
     use crate::Height;
@@ -821,7 +847,7 @@ mod tests {
     fn test_history_manipulation() {
         pub struct Test {
             name: String,
-            ctx: MockContext,
+            ctx: MockContext<IdentityChain>,
         }
         let cv = 1; // The version to use for all chains.
 

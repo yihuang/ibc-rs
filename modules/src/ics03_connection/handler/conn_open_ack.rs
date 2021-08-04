@@ -9,11 +9,12 @@ use crate::ics03_connection::events::Attributes;
 use crate::ics03_connection::handler::verify::{check_client_consensus_height, verify_proofs};
 use crate::ics03_connection::handler::{ConnectionIdState, ConnectionResult};
 use crate::ics03_connection::msgs::conn_open_ack::MsgConnectionOpenAck;
+use crate::ics24_host::identifier::HostChain;
 
-pub(crate) fn process(
-    ctx: &dyn ConnectionReader,
+pub(crate) fn process<Chain: HostChain, Reader: ConnectionReader<Chain>>(
+    ctx: &Reader,
     msg: MsgConnectionOpenAck,
-) -> HandlerResult<ConnectionResult, Error> {
+) -> HandlerResult<ConnectionResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     // Check the client's (consensus state) proof height.
@@ -110,7 +111,7 @@ mod tests {
     use crate::ics03_connection::msgs::conn_open_ack::MsgConnectionOpenAck;
     use crate::ics03_connection::msgs::ConnectionMsg;
     use crate::ics23_commitment::commitment::CommitmentPrefix;
-    use crate::ics24_host::identifier::{ChainId, ClientId};
+    use crate::ics24_host::identifier::{ChainId, ClientId, IdentityChain};
     use crate::mock::context::MockContext;
     use crate::mock::host::HostType;
     use crate::timestamp::ZERO_DURATION;
@@ -119,8 +120,8 @@ mod tests {
     fn conn_open_ack_msg_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
-            msg: ConnectionMsg,
+            ctx: MockContext<IdentityChain>,
+            msg: ConnectionMsg<IdentityChain>,
             want_pass: bool,
             match_error: Box<dyn FnOnce(error::Error)>,
         }

@@ -59,6 +59,20 @@ pub struct MockChain {
     event_receiver: EventReceiver,
 }
 
+impl HostChain for MockChain {
+    type Height = Height;
+
+    type ClientId = ClientId;
+
+    type ConnectionId = ConnectionId;
+
+    type ChannelId = ChannelId;
+
+    type PortId = PortId;
+
+    type Sequence = Sequence;
+}
+
 impl Chain for MockChain {
     type LightBlock = TmLightBlock;
     type Header = TendermintHeader;

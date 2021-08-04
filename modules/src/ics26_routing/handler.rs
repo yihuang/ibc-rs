@@ -6,6 +6,7 @@ use crate::ics02_client::handler::dispatch as ics2_msg_dispatcher;
 use crate::ics03_connection::handler::dispatch as ics3_msg_dispatcher;
 use crate::ics04_channel::handler::channel_dispatch as ics4_msg_dispatcher;
 use crate::ics04_channel::handler::packet_dispatch as ics04_packet_msg_dispatcher;
+use crate::ics24_host::identifier::HostChain;
 use crate::ics26_routing::context::Ics26Context;
 use crate::ics26_routing::error::Error;
 use crate::ics26_routing::msgs::Ics26Envelope::{
@@ -16,9 +17,12 @@ use crate::{events::IbcEvent, handler::HandlerOutput};
 /// Mimics the DeliverTx ABCI interface, but a slightly lower level. No need for authentication
 /// info or signature checks here.
 /// Returns a vector of all events that got generated as a byproduct of processing `messages`.
-pub fn deliver<Ctx>(ctx: &mut Ctx, messages: Vec<Any>) -> Result<Vec<IbcEvent>, Error>
+pub fn deliver<Ctx, Chain: HostChain>(
+    ctx: &mut Ctx,
+    messages: Vec<Any>,
+) -> Result<Vec<IbcEvent>, Error>
 where
-    Ctx: Ics26Context,
+    Ctx: Ics26Context<Chain>,
 {
     // Create a clone, which will store each intermediary stage of applying txs.
     let mut ctx_interim = ctx.clone();
@@ -42,16 +46,19 @@ where
 }
 
 /// Attempts to convert a message into a [Ics26Envelope] message
-pub fn decode(message: Any) -> Result<Ics26Envelope, Error> {
+pub fn decode<Chain: HostChain>(message: Any) -> Result<Ics26Envelope<Chain>, Error> {
     message.try_into()
 }
 
 /// Top-level ICS dispatch function. Routes incoming IBC messages to their corresponding module.
 /// Returns a handler output with empty result of type `HandlerOutput<()>` which contains the log
 /// and events produced after processing the input `msg`.
-pub fn dispatch<Ctx>(ctx: &mut Ctx, msg: Ics26Envelope) -> Result<HandlerOutput<()>, Error>
+pub fn dispatch<Ctx, Chain: HostChain>(
+    ctx: &mut Ctx,
+    msg: Ics26Envelope<Chain>,
+) -> Result<HandlerOutput<()>, Error>
 where
-    Ctx: Ics26Context,
+    Ctx: Ics26Context<Chain>,
 {
     let output = match msg {
         Ics2Msg(msg) => {
@@ -161,7 +168,7 @@ mod tests {
         ChannelMsg, PacketMsg,
     };
 
-    use crate::ics24_host::identifier::ConnectionId;
+    use crate::ics24_host::identifier::{ConnectionId, IdentityChain};
     use crate::ics26_routing::handler::dispatch;
     use crate::ics26_routing::msgs::Ics26Envelope;
     use crate::mock::client_state::{MockClientState, MockConsensusState};
@@ -179,7 +186,7 @@ mod tests {
         // Test parameters
         struct Test {
             name: String,
-            msg: Ics26Envelope,
+            msg: Ics26Envelope<IdentityChain>,
             want_pass: bool,
         }
         let default_signer = get_dummy_account_id();

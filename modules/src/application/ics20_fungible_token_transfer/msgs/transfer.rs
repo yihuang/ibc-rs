@@ -8,7 +8,7 @@ use ibc_proto::ibc::apps::transfer::v1::MsgTransfer as RawMsgTransfer;
 
 use crate::application::ics20_fungible_token_transfer::error::Error;
 use crate::ics02_client::height::Height;
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::HostChain;
 use crate::signer::Signer;
 use crate::timestamp::Timestamp;
 use crate::tx_msg::Msg;
@@ -19,11 +19,11 @@ pub const TYPE_URL: &str = "/ibc.applications.transfer.v1.MsgTransfer";
 /// Message definition for the "packet receiving" datagram.
 ///
 #[derive(Clone, Debug, PartialEq)]
-pub struct MsgTransfer {
+pub struct MsgTransfer<Chain: HostChain> {
     /// the port on which the packet will be sent
-    pub source_port: PortId,
+    pub source_port: Chain::PortId,
     /// the channel by which the packet will be sent
-    pub source_channel: ChannelId,
+    pub source_channel: Chain::ChannelId,
     /// the tokens to be transferred
     pub token: Option<ibc_proto::cosmos::base::v1beta1::Coin>,
     /// the sender address
@@ -32,13 +32,13 @@ pub struct MsgTransfer {
     pub receiver: Signer,
     /// Timeout height relative to the current block height.
     /// The timeout is disabled when set to 0.
-    pub timeout_height: Height,
+    pub timeout_height: Chain::Height,
     /// Timeout timestamp relative to the current block timestamp.
     /// The timeout is disabled when set to 0.
     pub timeout_timestamp: Timestamp,
 }
 
-impl Msg for MsgTransfer {
+impl<Chain: HostChain> Msg for MsgTransfer<Chain> {
     type ValidationError = Error;
     type Raw = RawMsgTransfer;
 
@@ -51,9 +51,9 @@ impl Msg for MsgTransfer {
     }
 }
 
-impl Protobuf<RawMsgTransfer> for MsgTransfer {}
+impl<Chain: HostChain> Protobuf<RawMsgTransfer> for MsgTransfer<Chain> {}
 
-impl TryFrom<RawMsgTransfer> for MsgTransfer {
+impl<Chain: HostChain> TryFrom<RawMsgTransfer> for MsgTransfer<Chain> {
     type Error = Error;
 
     fn try_from(raw_msg: RawMsgTransfer) -> Result<Self, Self::Error> {

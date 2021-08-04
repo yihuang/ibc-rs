@@ -1,7 +1,7 @@
 use crate::ics04_channel::channel::{validate_version, ChannelEnd};
 use crate::ics04_channel::error::Error as ChannelError;
 use crate::ics24_host::error::ValidationError;
-use crate::ics24_host::identifier::{ChannelId, PortId};
+use crate::ics24_host::identifier::HostChain;
 use crate::proofs::Proofs;
 use crate::signer::Signer;
 use crate::tx_msg::Msg;
@@ -18,20 +18,20 @@ pub const TYPE_URL: &str = "/ibc.core.channel.v1.MsgChannelOpenTry";
 /// Message definition for the second step in the channel open handshake (`ChanOpenTry` datagram).
 ///
 #[derive(Clone, Debug, PartialEq)]
-pub struct MsgChannelOpenTry {
-    pub port_id: PortId,
-    pub previous_channel_id: Option<ChannelId>,
-    pub channel: ChannelEnd,
+pub struct MsgChannelOpenTry<Chain: HostChain> {
+    pub port_id: Chain::PortId,
+    pub previous_channel_id: Option<Chain::ChannelId>,
+    pub channel: ChannelEnd<Chain>,
     pub counterparty_version: String, // TODO(romac): newtype this
     pub proofs: Proofs,
     pub signer: Signer,
 }
 
-impl MsgChannelOpenTry {
+impl<Chain: HostChain> MsgChannelOpenTry<Chain> {
     pub fn new(
-        port_id: PortId,
-        previous_channel_id: Option<ChannelId>,
-        channel: ChannelEnd,
+        port_id: Chain::PortId,
+        previous_channel_id: Option<Chain::ChannelId>,
+        channel: ChannelEnd<Chain>,
         counterparty_version: String,
         proofs: Proofs,
         signer: Signer,
@@ -47,23 +47,23 @@ impl MsgChannelOpenTry {
     }
 
     /// Getter: borrow the `port_id` from this message.
-    pub fn port_id(&self) -> &PortId {
+    pub fn port_id(&self) -> &Chain::PortId {
         &self.port_id
     }
-    pub fn previous_channel_id(&self) -> &Option<ChannelId> {
+    pub fn previous_channel_id(&self) -> &Option<Chain::ChannelId> {
         &self.previous_channel_id
     }
     pub fn counterparty_version(&self) -> &String {
         &self.counterparty_version
     }
-    pub fn channel(&self) -> &ChannelEnd {
+    pub fn channel(&self) -> &ChannelEnd<Chain> {
         &self.channel
     }
     pub fn proofs(&self) -> &Proofs {
         &self.proofs
     }
 }
-impl Msg for MsgChannelOpenTry {
+impl<Chain: HostChain> Msg for MsgChannelOpenTry<Chain> {
     type ValidationError = ChannelError;
     type Raw = RawMsgChannelOpenTry;
 
@@ -83,9 +83,9 @@ impl Msg for MsgChannelOpenTry {
     }
 }
 
-impl Protobuf<RawMsgChannelOpenTry> for MsgChannelOpenTry {}
+impl<Chain: HostChain> Protobuf<RawMsgChannelOpenTry> for MsgChannelOpenTry<Chain> {}
 
-impl TryFrom<RawMsgChannelOpenTry> for MsgChannelOpenTry {
+impl<Chain: HostChain> TryFrom<RawMsgChannelOpenTry> for MsgChannelOpenTry<Chain> {
     type Error = ChannelError;
 
     fn try_from(raw_msg: RawMsgChannelOpenTry) -> Result<Self, Self::Error> {
@@ -126,8 +126,8 @@ impl TryFrom<RawMsgChannelOpenTry> for MsgChannelOpenTry {
     }
 }
 
-impl From<MsgChannelOpenTry> for RawMsgChannelOpenTry {
-    fn from(domain_msg: MsgChannelOpenTry) -> Self {
+impl<Chain: HostChain> From<MsgChannelOpenTry<Chain>> for RawMsgChannelOpenTry {
+    fn from(domain_msg: MsgChannelOpenTry<Chain>) -> Self {
         RawMsgChannelOpenTry {
             port_id: domain_msg.port_id.to_string(),
             previous_channel_id: domain_msg

@@ -10,20 +10,21 @@ use crate::ics04_channel::msgs::{
     acknowledgement, chan_close_confirm, chan_close_init, chan_open_ack, chan_open_confirm,
     chan_open_init, chan_open_try, recv_packet, timeout, timeout_on_close, ChannelMsg, PacketMsg,
 };
+use crate::ics24_host::identifier::HostChain;
 use crate::ics26_routing::error::Error;
 use tendermint_proto::Protobuf;
 
 /// Enumeration of all messages that the local ICS26 module is capable of routing.
 #[derive(Clone, Debug)]
-pub enum Ics26Envelope {
+pub enum Ics26Envelope<Chain: HostChain> {
     Ics2Msg(ClientMsg),
-    Ics3Msg(ConnectionMsg),
-    Ics4ChannelMsg(ChannelMsg),
+    Ics3Msg(ConnectionMsg<Chain>),
+    Ics4ChannelMsg(ChannelMsg<Chain>),
     Ics4PacketMsg(PacketMsg),
     Ics20Msg(MsgTransfer),
 }
 
-impl TryFrom<Any> for Ics26Envelope {
+impl<Chain: HostChain> TryFrom<Any> for Ics26Envelope<Chain> {
     type Error = Error;
 
     fn try_from(any_msg: Any) -> Result<Self, Self::Error> {

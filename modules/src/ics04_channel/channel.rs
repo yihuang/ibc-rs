@@ -13,17 +13,21 @@ use ibc_proto::ibc::core::channel::v1::{
 use crate::events::IbcEventType;
 use crate::ics02_client::height::Height;
 use crate::ics04_channel::{error::Error, packet::Sequence};
-use crate::ics24_host::identifier::{ChannelId, ConnectionId, PortId};
+use crate::ics24_host::identifier::{ChannelId, ConnectionId, HostChain, PortId};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct IdentifiedChannelEnd {
-    pub port_id: PortId,
-    pub channel_id: ChannelId,
-    pub channel_end: ChannelEnd,
+pub struct IdentifiedChannelEnd<Chain: HostChain> {
+    pub port_id: Chain::PortId,
+    pub channel_id: Chain::ChannelId,
+    pub channel_end: ChannelEnd<Chain>,
 }
 
-impl IdentifiedChannelEnd {
-    pub fn new(port_id: PortId, channel_id: ChannelId, channel_end: ChannelEnd) -> Self {
+impl<Chain: HostChain> IdentifiedChannelEnd<Chain> {
+    pub fn new(
+        port_id: Chain::PortId,
+        channel_id: Chain::ChannelId,
+        channel_end: ChannelEnd<Chain>,
+    ) -> Self {
         IdentifiedChannelEnd {
             port_id,
             channel_id,
@@ -32,9 +36,9 @@ impl IdentifiedChannelEnd {
     }
 }
 
-impl Protobuf<RawIdentifiedChannel> for IdentifiedChannelEnd {}
+impl<Chain: HostChain> Protobuf<RawIdentifiedChannel> for IdentifiedChannelEnd<Chain> {}
 
-impl TryFrom<RawIdentifiedChannel> for IdentifiedChannelEnd {
+impl<Chain: HostChain> TryFrom<RawIdentifiedChannel> for IdentifiedChannelEnd<Chain> {
     type Error = Error;
 
     fn try_from(value: RawIdentifiedChannel) -> Result<Self, Self::Error> {
@@ -54,8 +58,8 @@ impl TryFrom<RawIdentifiedChannel> for IdentifiedChannelEnd {
     }
 }
 
-impl From<IdentifiedChannelEnd> for RawIdentifiedChannel {
-    fn from(value: IdentifiedChannelEnd) -> Self {
+impl<Chain: HostChain> From<IdentifiedChannelEnd<Chain>> for RawIdentifiedChannel {
+    fn from(value: IdentifiedChannelEnd<Chain>) -> Self {
         RawIdentifiedChannel {
             state: value.channel_end.state as i32,
             ordering: value.channel_end.ordering as i32,
@@ -74,15 +78,15 @@ impl From<IdentifiedChannelEnd> for RawIdentifiedChannel {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ChannelEnd {
+pub struct ChannelEnd<Chain: HostChain> {
     pub state: State,
     pub ordering: Order,
-    pub remote: Counterparty,
-    pub connection_hops: Vec<ConnectionId>,
+    pub remote: Counterparty<Chain>,
+    pub connection_hops: Vec<Chain::ConnectionId>,
     pub version: String,
 }
 
-impl Default for ChannelEnd {
+impl<Chain: HostChain> Default for ChannelEnd<Chain> {
     fn default() -> Self {
         ChannelEnd {
             state: State::Uninitialized,
@@ -94,9 +98,9 @@ impl Default for ChannelEnd {
     }
 }
 
-impl Protobuf<RawChannel> for ChannelEnd {}
+impl<Chain: HostChain> Protobuf<RawChannel> for ChannelEnd<Chain> {}
 
-impl TryFrom<RawChannel> for ChannelEnd {
+impl<Chain: HostChain> TryFrom<RawChannel> for ChannelEnd<Chain> {
     type Error = Error;
 
     fn try_from(value: RawChannel) -> Result<Self, Self::Error> {
@@ -134,8 +138,8 @@ impl TryFrom<RawChannel> for ChannelEnd {
     }
 }
 
-impl From<ChannelEnd> for RawChannel {
-    fn from(value: ChannelEnd) -> Self {
+impl<Chain: HostChain> From<ChannelEnd<Chain>> for RawChannel {
+    fn from(value: ChannelEnd<Chain>) -> Self {
         RawChannel {
             state: value.state as i32,
             ordering: value.ordering as i32,
@@ -150,12 +154,12 @@ impl From<ChannelEnd> for RawChannel {
     }
 }
 
-impl ChannelEnd {
+impl<Chain: HostChain> ChannelEnd<Chain> {
     /// Creates a new ChannelEnd in state Uninitialized and other fields parametrized.
     pub fn new(
         state: State,
         ordering: Order,
-        remote: Counterparty,
+        remote: Counterparty<Chain>,
         connection_hops: Vec<ConnectionId>,
         version: String,
     ) -> Self {
@@ -194,7 +198,7 @@ impl ChannelEnd {
         &self.ordering
     }
 
-    pub fn counterparty(&self) -> &Counterparty {
+    pub fn counterparty(&self) -> &Counterparty<Chain> {
         &self.remote
     }
 
@@ -234,7 +238,7 @@ impl ChannelEnd {
         self.connection_hops.eq(other)
     }
 
-    pub fn counterparty_matches(&self, other: &Counterparty) -> bool {
+    pub fn counterparty_matches(&self, other: &Counterparty<Chain>) -> bool {
         self.counterparty().eq(other)
     }
 
@@ -244,12 +248,12 @@ impl ChannelEnd {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Counterparty {
-    pub port_id: PortId,
-    pub channel_id: Option<ChannelId>,
+pub struct Counterparty<Chain: HostChain> {
+    pub port_id: Chain::PortId,
+    pub channel_id: Option<Chain::ChannelId>,
 }
 
-impl Default for Counterparty {
+impl<Chain: HostChain> Default for Counterparty<Chain> {
     fn default() -> Self {
         Counterparty {
             port_id: Default::default(),
@@ -258,19 +262,19 @@ impl Default for Counterparty {
     }
 }
 
-impl Counterparty {
-    pub fn new(port_id: PortId, channel_id: Option<ChannelId>) -> Self {
+impl<Chain: HostChain> Counterparty<Chain> {
+    pub fn new(port_id: Chain::PortId, channel_id: Option<Chain::ChannelId>) -> Self {
         Self {
             port_id,
             channel_id,
         }
     }
 
-    pub fn port_id(&self) -> &PortId {
+    pub fn port_id(&self) -> &Chain::PortId {
         &self.port_id
     }
 
-    pub fn channel_id(&self) -> Option<&ChannelId> {
+    pub fn channel_id(&self) -> Option<&Chain::ChannelId> {
         self.channel_id.as_ref()
     }
 
@@ -279,9 +283,9 @@ impl Counterparty {
     }
 }
 
-impl Protobuf<RawCounterparty> for Counterparty {}
+impl<Chain: HostChain> Protobuf<RawCounterparty> for Counterparty<Chain> {}
 
-impl TryFrom<RawCounterparty> for Counterparty {
+impl<Chain: HostChain> TryFrom<RawCounterparty> for Counterparty<Chain> {
     type Error = Error;
 
     fn try_from(value: RawCounterparty) -> Result<Self, Self::Error> {
@@ -297,8 +301,8 @@ impl TryFrom<RawCounterparty> for Counterparty {
     }
 }
 
-impl From<Counterparty> for RawCounterparty {
-    fn from(value: Counterparty) -> Self {
+impl<Chain: HostChain> From<Counterparty<Chain>> for RawCounterparty {
+    fn from(value: Counterparty<Chain>) -> Self {
         RawCounterparty {
             port_id: value.port_id.as_str().to_string(),
             channel_id: value

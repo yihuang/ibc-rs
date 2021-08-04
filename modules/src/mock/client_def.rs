@@ -9,7 +9,7 @@ use crate::ics04_channel::channel::ChannelEnd;
 use crate::ics04_channel::packet::Sequence;
 use crate::ics23_commitment::commitment::{CommitmentPrefix, CommitmentProofBytes, CommitmentRoot};
 use crate::ics23_commitment::merkle::apply_prefix;
-use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, PortId};
+use crate::ics24_host::identifier::{ChannelId, ClientId, ConnectionId, HostChain, PortId};
 use crate::ics24_host::Path;
 use crate::mock::client_state::{MockClientState, MockConsensusState};
 use crate::mock::header::MockHeader;
@@ -18,7 +18,7 @@ use crate::Height;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MockClient;
 
-impl ClientDef for MockClient {
+impl<Chain: HostChain> ClientDef<Chain> for MockClient {
     type Header = MockHeader;
     type ClientState = MockClientState;
     type ConsensusState = MockConsensusState;
@@ -72,7 +72,7 @@ impl ClientDef for MockClient {
         _prefix: &CommitmentPrefix,
         _proof: &CommitmentProofBytes,
         _connection_id: Option<&ConnectionId>,
-        _expected_connection_end: &ConnectionEnd,
+        _expected_connection_end: &ConnectionEnd<Chain>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -85,7 +85,7 @@ impl ClientDef for MockClient {
         _proof: &CommitmentProofBytes,
         _port_id: &PortId,
         _channel_id: &ChannelId,
-        _expected_channel_end: &ChannelEnd,
+        _expected_channel_end: &ChannelEnd<Chain>,
     ) -> Result<(), Error> {
         Ok(())
     }

@@ -5,7 +5,7 @@ use crate::ics03_connection::connection::ConnectionEnd;
 use crate::ics03_connection::context::ConnectionReader;
 use crate::ics03_connection::error::Error;
 use crate::ics03_connection::msgs::ConnectionMsg;
-use crate::ics24_host::identifier::ConnectionId;
+use crate::ics24_host::identifier::HostChain;
 
 pub mod conn_open_ack;
 pub mod conn_open_confirm;
@@ -26,27 +26,27 @@ pub enum ConnectionIdState {
 }
 
 #[derive(Clone, Debug)]
-pub struct ConnectionResult {
+pub struct ConnectionResult<Chain: HostChain> {
     /// The identifier for the connection which the handler processed. Typically this represents the
     /// newly-generated connection id (e.g., when processing `MsgConnectionOpenInit`) or
     /// an existing connection id (e.g., for `MsgConnectionOpenAck`).
-    pub connection_id: ConnectionId,
+    pub connection_id: Chain::ConnectionId,
 
     /// The state of the connection identifier (whether it was newly-generated or not).
     pub connection_id_state: ConnectionIdState,
 
     /// The connection end, which the handler produced as a result of processing the message.
-    pub connection_end: ConnectionEnd,
+    pub connection_end: ConnectionEnd<Chain>,
 }
 
 /// General entry point for processing any type of message related to the ICS3 connection open
 /// handshake protocol.
-pub fn dispatch<Ctx>(
+pub fn dispatch<Ctx, Chain: HostChain>(
     ctx: &Ctx,
-    msg: ConnectionMsg,
-) -> Result<HandlerOutput<ConnectionResult>, Error>
+    msg: ConnectionMsg<Chain>,
+) -> Result<HandlerOutput<ConnectionResult<Chain>>, Error>
 where
-    Ctx: ConnectionReader,
+    Ctx: ConnectionReader<Chain>,
 {
     match msg {
         ConnectionMsg::ConnectionOpenInit(msg) => conn_open_init::process(ctx, msg),

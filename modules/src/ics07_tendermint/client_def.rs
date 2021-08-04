@@ -12,13 +12,13 @@ use crate::ics07_tendermint::consensus_state::ConsensusState;
 use crate::ics07_tendermint::header::Header;
 use crate::ics23_commitment::commitment::{CommitmentPrefix, CommitmentProofBytes, CommitmentRoot};
 use crate::ics24_host::identifier::ConnectionId;
-use crate::ics24_host::identifier::{ChannelId, ClientId, PortId};
+use crate::ics24_host::identifier::{ChannelId, ClientId, HostChain, PortId};
 use crate::Height;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TendermintClient;
 
-impl ClientDef for TendermintClient {
+impl<Chain: HostChain> ClientDef<Chain> for TendermintClient {
     type Header = Header;
     type ClientState = ClientState;
     type ConsensusState = ConsensusState;
@@ -63,7 +63,7 @@ impl ClientDef for TendermintClient {
         _prefix: &CommitmentPrefix,
         _proof: &CommitmentProofBytes,
         _connection_id: Option<&ConnectionId>,
-        _expected_connection_end: &ConnectionEnd,
+        _expected_connection_end: &ConnectionEnd<Chain>,
     ) -> Result<(), Error> {
         todo!()
     }
@@ -76,7 +76,7 @@ impl ClientDef for TendermintClient {
         _proof: &CommitmentProofBytes,
         _port_id: &PortId,
         _channel_id: &ChannelId,
-        _expected_channel_end: &ChannelEnd,
+        _expected_channel_end: &ChannelEnd<Chain>,
     ) -> Result<(), Error> {
         todo!()
     }

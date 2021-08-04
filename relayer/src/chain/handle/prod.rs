@@ -38,7 +38,7 @@ use ibc_proto::ibc::core::connection::v1::QueryConnectionsRequest;
 
 use crate::{connection::ConnectionMsgType, error::Error, keyring::KeyEntry};
 
-use super::{reply_channel, ChainHandle, ChainRequest, ReplyTo, Subscription};
+use super::{reply_channel, ChainHandle, ChainRequest, HostChain, ReplyTo, Subscription};
 
 #[derive(Debug, Clone)]
 pub struct ProdChainHandle {
@@ -69,6 +69,20 @@ impl ProdChainHandle {
 
         receiver.recv().map_err(Error::channel_receive)?
     }
+}
+
+impl HostChain for ProdChainHandle {
+    type Height = Height;
+
+    type ClientId = ClientId;
+
+    type ConnectionId = ConnectionId;
+
+    type ChannelId = ChannelId;
+
+    type PortId = PortId;
+
+    type Sequence = Sequence;
 }
 
 impl ChainHandle for ProdChainHandle {

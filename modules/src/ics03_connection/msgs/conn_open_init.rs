@@ -7,7 +7,7 @@ use tendermint_proto::Protobuf;
 use crate::ics03_connection::connection::Counterparty;
 use crate::ics03_connection::error::Error;
 use crate::ics03_connection::version::Version;
-use crate::ics24_host::identifier::ClientId;
+use crate::ics24_host::identifier::HostChain;
 use crate::signer::Signer;
 use crate::tx_msg::Msg;
 
@@ -17,27 +17,27 @@ pub const TYPE_URL: &str = "/ibc.core.connection.v1.MsgConnectionOpenInit";
 /// Message definition `MsgConnectionOpenInit`  (i.e., the `ConnOpenInit` datagram).
 ///
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MsgConnectionOpenInit {
-    pub client_id: ClientId,
-    pub counterparty: Counterparty,
+pub struct MsgConnectionOpenInit<Chain: HostChain> {
+    pub client_id: Chain::ClientId,
+    pub counterparty: Counterparty<Chain>,
     pub version: Version,
     pub delay_period: Duration,
     pub signer: Signer,
 }
 
-impl MsgConnectionOpenInit {
+impl<Chain: HostChain> MsgConnectionOpenInit<Chain> {
     /// Getter: borrow the `client_id` from this message.
-    pub fn client_id(&self) -> &ClientId {
+    pub fn client_id(&self) -> &Chain::ClientId {
         &self.client_id
     }
 
     /// Getter: borrow the `counterparty` from this message.
-    pub fn counterparty(&self) -> &Counterparty {
+    pub fn counterparty(&self) -> &Counterparty<Chain> {
         &self.counterparty
     }
 }
 
-impl Msg for MsgConnectionOpenInit {
+impl<Chain: HostChain> Msg for MsgConnectionOpenInit<Chain> {
     type ValidationError = Error;
     type Raw = RawMsgConnectionOpenInit;
 
@@ -50,9 +50,9 @@ impl Msg for MsgConnectionOpenInit {
     }
 }
 
-impl Protobuf<RawMsgConnectionOpenInit> for MsgConnectionOpenInit {}
+impl<Chain: HostChain> Protobuf<RawMsgConnectionOpenInit> for MsgConnectionOpenInit<Chain> {}
 
-impl TryFrom<RawMsgConnectionOpenInit> for MsgConnectionOpenInit {
+impl<Chain: HostChain> TryFrom<RawMsgConnectionOpenInit> for MsgConnectionOpenInit<Chain> {
     type Error = Error;
 
     fn try_from(msg: RawMsgConnectionOpenInit) -> Result<Self, Self::Error> {
@@ -69,8 +69,8 @@ impl TryFrom<RawMsgConnectionOpenInit> for MsgConnectionOpenInit {
     }
 }
 
-impl From<MsgConnectionOpenInit> for RawMsgConnectionOpenInit {
-    fn from(ics_msg: MsgConnectionOpenInit) -> Self {
+impl<Chain: HostChain> From<MsgConnectionOpenInit<Chain>> for RawMsgConnectionOpenInit {
+    fn from(ics_msg: MsgConnectionOpenInit<Chain>) -> Self {
         RawMsgConnectionOpenInit {
             client_id: ics_msg.client_id.as_str().to_string(),
             counterparty: Some(ics_msg.counterparty.into()),
@@ -88,11 +88,11 @@ pub mod test_util {
     use crate::ics03_connection::msgs::conn_open_init::MsgConnectionOpenInit;
     use crate::ics03_connection::msgs::test_util::get_dummy_raw_counterparty;
     use crate::ics03_connection::version::Version;
-    use crate::ics24_host::identifier::ClientId;
+    use crate::ics24_host::identifier::{ClientId, HostChain};
     use crate::test_utils::get_dummy_bech32_account;
 
     /// Extends the implementation with additional helper methods.
-    impl MsgConnectionOpenInit {
+    impl<Chain: HostChain> MsgConnectionOpenInit<Chain> {
         /// Setter for `client_id`. Amenable to chaining, since it consumes the input message.
         pub fn with_client_id(self, client_id: ClientId) -> Self {
             MsgConnectionOpenInit { client_id, ..self }

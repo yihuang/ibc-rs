@@ -19,17 +19,17 @@ use crate::supervisor::Error;
 
 use super::handle::ChainHandle;
 
-pub fn counterparty_chain_from_connection(
-    src_chain: &impl ChainHandle,
-    src_connection_id: &ConnectionId,
+pub fn counterparty_chain_from_connection<Chain: ChainHandle>(
+    src_chain: &Chain,
+    src_connection_id: &Chain::ConnectionId,
 ) -> Result<ChainId, Error> {
     let connection_end = src_chain
-        .query_connection(src_connection_id, Height::zero())
+        .query_connection(src_connection_id, Height::zero().into())
         .map_err(Error::relayer)?;
 
-    let client_id = connection_end.client_id();
+    let client_id = connection_end.client_id().clone();
     let client_state = src_chain
-        .query_client_state(client_id, Height::zero())
+        .query_client_state(&client_id.into(), Height::zero().into())
         .map_err(Error::relayer)?;
 
     trace!(
@@ -54,7 +54,7 @@ fn connection_on_destination(
 
     for counterparty_connection in counterparty_connections.into_iter() {
         let counterparty_connection_end = counterparty_chain
-            .query_connection(&counterparty_connection, Height::zero())
+            .query_connection(&counterparty_connection, Height::zero().into())
             .map_err(Error::relayer)?;
 
         let local_connection_end = &counterparty_connection_end.counterparty();
@@ -67,13 +67,13 @@ fn connection_on_destination(
     Ok(None)
 }
 
-pub fn connection_state_on_destination(
+pub fn connection_state_on_destination<Chain: ChainHandle>(
     connection: IdentifiedConnectionEnd,
-    counterparty_chain: &impl ChainHandle,
+    counterparty_chain: &Chain,
 ) -> Result<ConnectionState, Error> {
     if let Some(remote_connection_id) = connection.connection_end.counterparty().connection_id() {
         let connection_end = counterparty_chain
-            .query_connection(remote_connection_id, Height::zero())
+            .query_connection(&remote_connection_id.clone().into(), Height::zero().into())
             .map_err(Error::relayer)?;
 
         Ok(connection_end.state)
@@ -118,19 +118,19 @@ impl ChannelConnectionClient {
 
 /// Returns the [`ChannelConnectionClient`] associated with the
 /// provided port and channel id.
-pub fn channel_connection_client(
-    chain: &impl ChainHandle,
-    port_id: &PortId,
-    channel_id: &ChannelId,
+pub fn channel_connection_client<Chain: ChainHandle>(
+    chain: &Chain,
+    port_id: &Chain::PortId,
+    channel_id: &Chain::ChannelId,
 ) -> Result<ChannelConnectionClient, Error> {
     let channel_end = chain
-        .query_channel(port_id, channel_id, Height::zero())
+        .query_channel(port_id, channel_id, Height::zero().into())
         .map_err(Error::relayer)?;
 
     if channel_end.state_matches(&State::Uninitialized) {
         return Err(Error::channel_uninitialized(
-            port_id.clone(),
-            channel_id.clone(),
+            port_id.clone().into(),
+            channel_id.clone().into(),
             chain.id(),
         ));
     }
@@ -138,36 +138,40 @@ pub fn channel_connection_client(
     let connection_id = channel_end
         .connection_hops()
         .first()
-        .ok_or_else(|| Error::missing_connection_hops(channel_id.clone(), chain.id()))?;
+        .ok_or_else(|| Error::missing_connection_hops(channel_id.clone().into(), chain.id()))?;
 
     let connection_end = chain
-        .query_connection(connection_id, Height::zero())
+        .query_connection(&connection_id.clone().into(), Height::zero().into())
         .map_err(Error::relayer)?;
 
     if !connection_end.is_open() {
         return Err(Error::connection_not_open(
             connection_id.clone(),
-            channel_id.clone(),
+            channel_id.clone().into(),
             chain.id(),
         ));
     }
 
-    let client_id = connection_end.client_id();
+    let client_id = connection_end.client_id().clone();
     let client_state = chain
-        .query_client_state(client_id, Height::zero())
+        .query_client_state(&client_id.into(), Height::zero().into())
         .map_err(Error::relayer)?;
 
     let client = IdentifiedAnyClientState::new(client_id.clone(), client_state);
     let connection = IdentifiedConnectionEnd::new(connection_id.clone(), connection_end);
-    let channel = IdentifiedChannelEnd::new(port_id.clone(), channel_id.clone(), channel_end);
+    let channel = IdentifiedChannelEnd::new(
+        port_id.clone().into(),
+        channel_id.clone().into(),
+        channel_end,
+    );
 
     Ok(ChannelConnectionClient::new(channel, connection, client))
 }
 
-pub fn counterparty_chain_from_channel(
-    src_chain: &impl ChainHandle,
-    src_channel_id: &ChannelId,
-    src_port_id: &PortId,
+pub fn counterparty_chain_from_channel<Chain: ChainHandle>(
+    src_chain: &Chain,
+    src_channel_id: &Chain::ChannelId,
+    src_port_id: &Chain::PortId,
 ) -> Result<ChainId, Error> {
     channel_connection_client(src_chain, src_port_id, src_channel_id)
         .map(|c| c.client.client_state.chain_id())

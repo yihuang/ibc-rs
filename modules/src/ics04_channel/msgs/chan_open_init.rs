@@ -1,6 +1,6 @@
 use crate::ics04_channel::channel::ChannelEnd;
 use crate::ics04_channel::error::Error;
-use crate::ics24_host::identifier::PortId;
+use crate::ics24_host::identifier::{HostChain, PortId};
 use crate::signer::Signer;
 use crate::tx_msg::Msg;
 
@@ -15,14 +15,14 @@ pub const TYPE_URL: &str = "/ibc.core.channel.v1.MsgChannelOpenInit";
 /// Message definition for the first step in the channel open handshake (`ChanOpenInit` datagram).
 ///
 #[derive(Clone, Debug, PartialEq)]
-pub struct MsgChannelOpenInit {
-    pub port_id: PortId,
-    pub channel: ChannelEnd,
+pub struct MsgChannelOpenInit<Chain: HostChain> {
+    pub port_id: Chain::PortId,
+    pub channel: ChannelEnd<Chain>,
     pub signer: Signer,
 }
 
-impl MsgChannelOpenInit {
-    pub fn new(port_id: PortId, channel: ChannelEnd, signer: Signer) -> Self {
+impl<Chain: HostChain> MsgChannelOpenInit<Chain> {
+    pub fn new(port_id: Chain::PortId, channel: ChannelEnd<Chain>, signer: Signer) -> Self {
         Self {
             port_id,
             channel,
@@ -36,12 +36,12 @@ impl MsgChannelOpenInit {
     }
 
     /// Getter: borrow the `channelEnd` from this message.
-    pub fn channel(&self) -> &ChannelEnd {
+    pub fn channel(&self) -> &ChannelEnd<Chain> {
         &self.channel
     }
 }
 
-impl Msg for MsgChannelOpenInit {
+impl<Chain: HostChain> Msg for MsgChannelOpenInit<Chain> {
     type ValidationError = Error;
     type Raw = RawMsgChannelOpenInit;
 
@@ -54,9 +54,9 @@ impl Msg for MsgChannelOpenInit {
     }
 }
 
-impl Protobuf<RawMsgChannelOpenInit> for MsgChannelOpenInit {}
+impl<Chain: HostChain> Protobuf<RawMsgChannelOpenInit> for MsgChannelOpenInit<Chain> {}
 
-impl TryFrom<RawMsgChannelOpenInit> for MsgChannelOpenInit {
+impl<Chain: HostChain> TryFrom<RawMsgChannelOpenInit> for MsgChannelOpenInit<Chain> {
     type Error = Error;
 
     fn try_from(raw_msg: RawMsgChannelOpenInit) -> Result<Self, Self::Error> {
@@ -71,8 +71,8 @@ impl TryFrom<RawMsgChannelOpenInit> for MsgChannelOpenInit {
     }
 }
 
-impl From<MsgChannelOpenInit> for RawMsgChannelOpenInit {
-    fn from(domain_msg: MsgChannelOpenInit) -> Self {
+impl<Chain: HostChain> From<MsgChannelOpenInit<Chain>> for RawMsgChannelOpenInit {
+    fn from(domain_msg: MsgChannelOpenInit<Chain>) -> Self {
         RawMsgChannelOpenInit {
             port_id: domain_msg.port_id.to_string(),
             channel: Some(domain_msg.channel.into()),

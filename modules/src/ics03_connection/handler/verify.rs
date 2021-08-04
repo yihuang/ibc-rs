@@ -7,15 +7,15 @@ use crate::ics03_connection::connection::ConnectionEnd;
 use crate::ics03_connection::context::ConnectionReader;
 use crate::ics03_connection::error::Error;
 use crate::ics23_commitment::commitment::CommitmentProofBytes;
+use crate::ics24_host::identifier::HostChain;
 use crate::proofs::{ConsensusProof, Proofs};
-use crate::Height;
 
 /// Entry point for verifying all proofs bundled in any ICS3 message.
-pub fn verify_proofs(
-    ctx: &dyn ConnectionReader,
+pub fn verify_proofs<Chain: HostChain, Reader: ConnectionReader<Chain>>(
+    ctx: &Reader,
     client_state: Option<AnyClientState>,
-    connection_end: &ConnectionEnd,
-    expected_conn: &ConnectionEnd,
+    connection_end: &ConnectionEnd<Chain>,
+    expected_conn: &ConnectionEnd<Chain>,
     proofs: &Proofs,
 ) -> Result<(), Error> {
     verify_connection_proof(
@@ -56,11 +56,11 @@ pub fn verify_proofs(
 /// Verifies the authenticity and semantic correctness of a commitment `proof`. The commitment
 /// claims to prove that an object of type connection exists on the source chain (i.e., the chain
 /// which created this proof). This object must match the state of `expected_conn`.
-pub fn verify_connection_proof(
-    ctx: &dyn ConnectionReader,
-    connection_end: &ConnectionEnd,
-    expected_conn: &ConnectionEnd,
-    proof_height: Height,
+pub fn verify_connection_proof<Chain: HostChain, Reader: ConnectionReader<Chain>>(
+    ctx: &Reader,
+    connection_end: &ConnectionEnd<Chain>,
+    expected_conn: &ConnectionEnd<Chain>,
+    proof_height: Chain::Height,
     proof: &CommitmentProofBytes,
 ) -> Result<(), Error> {
     // Fetch the client state (IBC client on the local/host chain).
@@ -108,11 +108,11 @@ pub fn verify_connection_proof(
 /// complete verification: that the client state the counterparty stores is valid (i.e., not frozen,
 /// at the same revision as the current chain, with matching chain identifiers, etc) and that the
 /// `proof` is correct.
-pub fn verify_client_proof(
-    ctx: &dyn ConnectionReader,
-    connection_end: &ConnectionEnd,
+pub fn verify_client_proof<Chain: HostChain, Reader: ConnectionReader<Chain>>(
+    ctx: &Reader,
+    connection_end: &ConnectionEnd<Chain>,
     expected_client_state: AnyClientState,
-    proof_height: Height,
+    proof_height: Chain::Height,
     proof: &CommitmentProofBytes,
 ) -> Result<(), Error> {
     // Fetch the local client state (IBC client running on the host chain).
@@ -147,10 +147,10 @@ pub fn verify_client_proof(
         })
 }
 
-pub fn verify_consensus_proof(
-    ctx: &dyn ConnectionReader,
-    connection_end: &ConnectionEnd,
-    proof_height: Height,
+pub fn verify_consensus_proof<Chain: HostChain, Reader: ConnectionReader<Chain>>(
+    ctx: &Reader,
+    connection_end: &ConnectionEnd<Chain>,
+    proof_height: Chain::Height,
     proof: &ConsensusProof,
 ) -> Result<(), Error> {
     // Fetch the client state (IBC client on the local chain).
@@ -184,9 +184,9 @@ pub fn verify_consensus_proof(
 
 /// Checks that `claimed_height` is within normal bounds, i.e., fresh enough so that the chain has
 /// not pruned it yet, but not newer than the current (actual) height of the local chain.
-pub fn check_client_consensus_height(
-    ctx: &dyn ConnectionReader,
-    claimed_height: Height,
+pub fn check_client_consensus_height<Chain: HostChain, Reader: ConnectionReader<Chain>>(
+    ctx: &Reader,
+    claimed_height: Chain::Height,
 ) -> Result<(), Error> {
     if claimed_height > ctx.host_current_height() {
         // Fail if the consensus height is too advanced.

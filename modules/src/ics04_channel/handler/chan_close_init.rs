@@ -8,11 +8,12 @@ use crate::ics04_channel::error::Error;
 use crate::ics04_channel::events::Attributes;
 use crate::ics04_channel::handler::{ChannelIdState, ChannelResult};
 use crate::ics04_channel::msgs::chan_close_init::MsgChannelCloseInit;
+use crate::ics24_host::identifier::HostChain;
 
-pub(crate) fn process(
-    ctx: &dyn ChannelReader,
+pub(crate) fn process<Chain: HostChain, Reader: ChannelReader<Chain>>(
+    ctx: &Reader,
     msg: MsgChannelCloseInit,
-) -> HandlerResult<ChannelResult, Error> {
+) -> HandlerResult<ChannelResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     // Unwrap the old channel end and validate it against the message.

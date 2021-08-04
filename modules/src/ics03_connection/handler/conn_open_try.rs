@@ -9,12 +9,12 @@ use crate::ics03_connection::events::Attributes;
 use crate::ics03_connection::handler::verify::{check_client_consensus_height, verify_proofs};
 use crate::ics03_connection::handler::{ConnectionIdState, ConnectionResult};
 use crate::ics03_connection::msgs::conn_open_try::MsgConnectionOpenTry;
-use crate::ics24_host::identifier::ConnectionId;
+use crate::ics24_host::identifier::{ConnectionId, HostChain};
 
-pub(crate) fn process(
-    ctx: &dyn ConnectionReader,
-    msg: MsgConnectionOpenTry,
-) -> HandlerResult<ConnectionResult, Error> {
+pub(crate) fn process<Chain: HostChain, Reader: ConnectionReader<Chain>>(
+    ctx: &Reader,
+    msg: MsgConnectionOpenTry<Chain>,
+) -> HandlerResult<ConnectionResult<Chain>, Error> {
     let mut output = HandlerOutput::builder();
 
     // Check that consensus height (for client proof) in message is not too advanced nor too old.
@@ -128,7 +128,7 @@ mod tests {
     use crate::ics03_connection::msgs::conn_open_try::test_util::get_dummy_raw_msg_conn_open_try;
     use crate::ics03_connection::msgs::conn_open_try::MsgConnectionOpenTry;
     use crate::ics03_connection::msgs::ConnectionMsg;
-    use crate::ics24_host::identifier::ChainId;
+    use crate::ics24_host::identifier::{ChainId, IdentityChain};
     use crate::mock::context::MockContext;
     use crate::mock::host::HostType;
     use crate::Height;
@@ -137,8 +137,8 @@ mod tests {
     fn conn_open_try_msg_processing() {
         struct Test {
             name: String,
-            ctx: MockContext,
-            msg: ConnectionMsg,
+            ctx: MockContext<IdentityChain>,
+            msg: ConnectionMsg<IdentityChain>,
             want_pass: bool,
         }
 
