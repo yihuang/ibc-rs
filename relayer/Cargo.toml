@@ -75,7 +75,7 @@ version = "=0.21.0"
 features = ["unstable"]
 
 [dependencies.tendermint-proto]
-version = "=0.21.0"
+version = "=0.26.0"
 
 [dev-dependencies]
 ibc = { version = "0.6.2", path = "../modules", features = ["mocks"] }
