@@ -85,4 +85,4 @@ tracing-subscriber = "0.2.19"
 test-env-log = { version = "0.2.7", features = ["trace"] }
 
 # Needed for generating (synthetic) light blocks.
-tendermint-testgen = { version = "=0.21.0" }
+tendermint-testgen = { version = "=0.27.0" }
